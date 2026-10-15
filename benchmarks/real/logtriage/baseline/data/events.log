@@ -1,0 +1,643 @@
+2026-10-14T00:00:00Z INFO worker queue depth above threshold
+2026-10-14T00:00:07Z CRITICAL api request completed
+2026-10-14T00:00:14Z DEBUG worker queue depth above threshold
+2026-10-14T00:00:21Z ERROR storage disk usage above 85 percent
+2026-10-14T00:00:28Z CRITICAL api connection reset by peer
+2026-10-14T00:00:35Z INFO api upstream returned 503
+2026-10-14T00:00:35Z WARN api
+2026-10-14T00:00:42Z INFO scheduler no work available
+2026-10-14T00:00:49Z WARN storage disk usage above 85 percent
+2026-10-14T00:00:56Z DEBUG api request completed
+2026-10-14T00:01:03Z CRITICAL storage disk usage above 85 percent
+2026-10-14T00:01:10Z DEBUG storage compaction finished
+2026-10-14T00:01:17Z DEBUG api request completed
+2026-10-14T00:01:24Z INFO auth token validated
+2026-10-14T00:01:31Z CRITICAL auth token validated
+2026-10-14T00:01:38Z CRITICAL api payload rejected
+2026-10-14T00:01:45Z INFO worker job retried
+2026-10-14T00:01:52Z ERROR api connection reset by peer
+2026-10-14T00:01:59Z INFO worker job finished
+2026-10-14T00:01:59Z TRACE worker unknown level was logged
+2026-10-14T00:02:06Z DEBUG storage checksum mismatch
+2026-10-14T00:02:13Z INFO storage compaction finished
+2026-10-14T00:02:20Z CRITICAL api upstream returned 503
+2026-10-14T00:02:27Z INFO api slow request took 4.2s
+2026-10-14T00:02:34Z WARN api connection reset by peer
+2026-10-14T00:02:41Z CRITICAL storage compaction finished
+2026-10-14T00:02:48Z WARN worker job retried
+2026-10-14T00:02:55Z ERROR api payload rejected
+2026-10-14T00:03:02Z INFO storage compaction finished
+2026-10-14T00:03:09Z INFO worker job finished
+2026-10-14T00:03:16Z ERROR scheduler lock contention
+2026-10-14T00:03:23Z DEBUG api request completed
+  continuation of the previous entry, indented text
+2026-10-14T00:03:30Z INFO api connection reset by peer
+2026-10-14T00:03:37Z INFO worker lease expired
+2026-10-14T00:03:44Z ERROR api request completed
+2026-10-14T00:03:51Z INFO worker job finished
+2026-10-14T00:03:58Z WARN worker queue depth above threshold
+2026-10-14T00:04:05Z ERROR storage segment flushed
+2026-10-14T00:04:12Z INFO scheduler lock contention
+2026-10-14T00:04:19Z WARN worker job finished
+2026-10-14T00:04:26Z INFO api slow request took 4.2s
+2026-10-14T00:04:33Z INFO storage segment flushed
+2026-10-14T00:04:40Z INFO api slow request took 4.2s
+2026-10-14T00:04:47Z DEBUG api slow request took 4.2s
+
+2026-10-14T00:04:54Z ERROR worker lease expired
+2026-10-14T00:05:01Z INFO api slow request took 4.2s
+2026-10-14T00:05:08Z INFO api slow request took 4.2s
+2026-10-14T00:05:15Z CRITICAL scheduler no work available
+2026-10-14T00:05:22Z ERROR storage segment flushed
+2026-10-14T00:05:29Z ERROR scheduler tick
+2026-10-14T00:05:36Z DEBUG auth token validated
+2026-10-14T00:05:43Z INFO storage segment flushed
+2026-10-14T00:05:50Z WARN worker job finished
+2026-10-14T00:05:57Z ERROR api connection reset by peer
+2026-10-14T00:06:04Z INFO api request completed
+2026-10-14T00:06:11Z WARN storage disk usage above 85 percent
+2026-10-14T00:06:18Z INFO auth token validated
+2026-10-14T00:06:25Z WARN worker job retried
+2026-10-14T00:06:32Z DEBUG api slow request took 4.2s
+2026-10-14T00:06:39Z CRITICAL worker job retried
+2026-10-14T00:06:46Z INFO api slow request took 4.2s
+2026-10-14T00:06:53Z INFO storage checksum mismatch
+2026-10-14T00:07:00Z DEBUG api payload rejected
+2026-10-14T00:07:07Z DEBUG worker job retried
+2026-10-14T00:07:14Z WARN api payload rejected
+2026-10-14T00:07:21Z INFO worker queue depth above threshold
+2026-10-14T00:07:28Z CRITICAL scheduler tick
+2026-10-14T00:07:35Z WARN scheduler lock contention
+2026-10-14T00:07:42Z ERROR api upstream returned 503
+2026-10-14T00:07:49Z ERROR scheduler cron entry skipped
+2026-10-14T00:07:56Z INFO scheduler tick
+2026-10-14T00:08:03Z INFO storage disk usage above 85 percent
+2026-10-14T00:08:10Z INFO api upstream returned 503
+2026-10-14T00:08:17Z INFO auth token validated
+2026-10-14T00:08:24Z ERROR worker job retried
+2026-10-14T00:08:31Z CRITICAL api upstream returned 503
+2026-10-14T00:08:38Z INFO scheduler lock contention
+2026-10-14T00:08:45Z DEBUG api request completed
+2026-10-14T00:08:52Z INFO storage segment flushed
+2026-10-14T00:08:59Z DEBUG scheduler cron entry skipped
+2026-10-14T00:09:06Z ERROR worker queue depth above threshold
+2026-10-14T00:09:13Z INFO api payload rejected
+2026-10-14T00:09:20Z CRITICAL storage segment flushed
+2026-10-14T00:09:27Z INFO storage disk usage above 85 percent
+2026-10-14T00:09:34Z WARN api connection reset by peer
+2026-10-14T00:09:41Z WARN storage segment flushed
+2026-10-14T00:09:48Z DEBUG worker queue depth above threshold
+2026-10-14T00:09:55Z ERROR worker queue depth above threshold
+2026-10-14T00:10:02Z INFO auth signature mismatch
+2026-10-14T00:10:09Z INFO auth token validated
+2026-10-14T00:10:16Z DEBUG api connection reset by peer
+2026-10-14T00:10:23Z INFO api payload rejected
+2026-10-14T00:10:30Z DEBUG api slow request took 4.2s
+2026-10-14T00:10:37Z INFO auth token validated
+2026-10-14T00:10:44Z INFO auth signature mismatch
+2026-10-14T00:10:51Z CRITICAL worker queue depth above threshold
+2026-10-14T00:10:58Z INFO scheduler no work available
+2026-10-14T00:10:58Z WARN scheduler
+2026-10-14T00:11:05Z CRITICAL storage checksum mismatch
+2026-10-14T00:11:12Z ERROR worker job retried
+2026-10-14T00:11:19Z WARN scheduler cron entry skipped
+2026-10-14T00:11:26Z INFO storage segment flushed
+2026-10-14T00:11:33Z WARN storage disk usage above 85 percent
+2026-10-14T00:11:40Z ERROR api slow request took 4.2s
+2026-10-14T00:11:47Z ERROR storage compaction finished
+2026-10-14T00:11:54Z DEBUG storage disk usage above 85 percent
+2026-10-14T00:12:01Z ERROR api request completed
+2026-10-14T00:12:08Z ERROR worker job retried
+2026-10-14T00:12:15Z CRITICAL storage checksum mismatch
+2026-10-14T00:12:22Z INFO api request completed
+2026-10-14T00:12:29Z ERROR api slow request took 4.2s
+2026-10-14T00:12:36Z INFO worker queue depth above threshold
+2026-10-14T00:12:43Z DEBUG scheduler cron entry skipped
+2026-10-14T00:12:50Z INFO storage segment flushed
+2026-10-14T00:12:57Z INFO storage checksum mismatch
+2026-10-14T00:13:04Z CRITICAL api slow request took 4.2s
+2026-10-14T00:13:11Z ERROR api slow request took 4.2s
+2026-10-14T00:13:18Z INFO auth token expired
+2026-10-14T00:13:25Z ERROR storage segment flushed
+2026-10-14T00:13:32Z INFO api slow request took 4.2s
+2026-10-14T00:13:39Z INFO api connection reset by peer
+2026-10-14T00:13:46Z INFO api slow request took 4.2s
+2026-10-14T00:13:53Z INFO storage segment flushed
+2026-10-14T00:14:00Z INFO storage checksum mismatch
+2026-10-14T00:14:07Z WARN api connection reset by peer
+2026-10-14T00:14:14Z CRITICAL scheduler no work available
+2026-10-14T00:14:21Z INFO worker job finished
+2026-10-14T00:14:28Z INFO api upstream returned 503
+2026-10-14T00:14:35Z INFO api upstream returned 503
+2026-10-14T00:14:42Z INFO api payload rejected
+2026-10-14T00:14:49Z INFO auth token expired
+2026-10-14T00:14:56Z DEBUG worker queue depth above threshold
+2026-10-14T00:15:03Z WARN worker lease expired
+2026-10-14T00:15:10Z DEBUG api payload rejected
+2026-10-14T00:15:10Z TRACE api unknown level was logged
+2026-10-14T00:15:17Z WARN scheduler tick
+2026-10-14T00:15:24Z ERROR api payload rejected
+2026-10-14T00:15:31Z ERROR storage checksum mismatch
+2026-10-14T00:15:38Z INFO scheduler cron entry skipped
+2026-10-14T00:15:45Z DEBUG api upstream returned 503
+2026-10-14T00:15:52Z INFO api upstream returned 503
+2026-10-14T00:15:59Z ERROR worker job finished
+2026-10-14T00:16:06Z WARN worker job retried
+
+2026-10-14T00:16:13Z ERROR worker job retried
+2026-10-14T00:16:20Z ERROR worker job finished
+2026-10-14T00:16:27Z CRITICAL worker job finished
+2026-10-14T00:16:34Z CRITICAL api payload rejected
+2026-10-14T00:16:41Z WARN auth signature mismatch
+2026-10-14T00:16:48Z INFO worker queue depth above threshold
+2026-10-14T00:16:55Z WARN scheduler cron entry skipped
+2026-10-14T00:17:02Z INFO storage disk usage above 85 percent
+2026-10-14T00:17:09Z WARN api upstream returned 503
+2026-10-14T00:17:16Z WARN worker lease expired
+2026-10-14T00:17:23Z CRITICAL api slow request took 4.2s
+2026-10-14T00:17:30Z INFO storage segment flushed
+2026-10-14T00:17:37Z DEBUG api connection reset by peer
+2026-10-14T00:17:44Z CRITICAL auth token expired
+2026-10-14T00:17:51Z INFO auth signature mismatch
+2026-10-14T00:17:58Z INFO api connection reset by peer
+2026-10-14T00:18:05Z CRITICAL worker queue depth above threshold
+2026-10-14T00:18:12Z WARN auth signature mismatch
+2026-10-14T00:18:19Z ERROR api request completed
+2026-10-14T00:18:26Z DEBUG scheduler cron entry skipped
+2026-10-14T00:18:33Z CRITICAL api connection reset by peer
+2026-10-14T00:18:40Z ERROR api upstream returned 503
+2026-10-14T00:18:47Z INFO storage disk usage above 85 percent
+2026-10-14T00:18:54Z INFO storage checksum mismatch
+2026-10-14T00:19:01Z WARN api slow request took 4.2s
+2026-10-14T00:19:08Z ERROR storage segment flushed
+2026-10-14T00:19:15Z DEBUG api payload rejected
+2026-10-14T00:19:22Z INFO api connection reset by peer
+2026-10-14T00:19:29Z ERROR auth token expired
+2026-10-14T00:19:36Z ERROR api connection reset by peer
+2026-10-14T00:19:43Z DEBUG storage segment flushed
+2026-10-14T00:19:50Z DEBUG storage checksum mismatch
+2026-10-14T00:19:57Z INFO api request completed
+2026-10-14T00:20:04Z CRITICAL storage segment flushed
+2026-10-14T00:20:11Z ERROR worker lease expired
+2026-10-14T00:20:18Z ERROR storage disk usage above 85 percent
+2026-10-14T00:20:25Z WARN api payload rejected
+2026-10-14T00:20:32Z CRITICAL api request completed
+2026-10-14T00:20:39Z ERROR auth signature mismatch
+2026-10-14T00:20:46Z WARN storage compaction finished
+2026-10-14T00:20:53Z DEBUG storage compaction finished
+2026-10-14T00:21:00Z WARN storage checksum mismatch
+  continuation of the previous entry, indented text
+2026-10-14T00:21:07Z CRITICAL auth token validated
+2026-10-14T00:21:14Z ERROR api upstream returned 503
+2026-10-14T00:21:21Z INFO scheduler lock contention
+2026-10-14T00:21:21Z WARN scheduler
+2026-10-14T00:21:28Z ERROR worker job retried
+2026-10-14T00:21:35Z INFO worker job finished
+2026-10-14T00:21:42Z CRITICAL auth token validated
+2026-10-14T00:21:49Z INFO auth signature mismatch
+2026-10-14T00:21:56Z INFO storage segment flushed
+2026-10-14T00:22:03Z ERROR scheduler lock contention
+2026-10-14T00:22:10Z INFO worker queue depth above threshold
+2026-10-14T00:22:17Z DEBUG api upstream returned 503
+2026-10-14T00:22:24Z INFO scheduler no work available
+2026-10-14T00:22:31Z ERROR api upstream returned 503
+2026-10-14T00:22:38Z DEBUG api slow request took 4.2s
+2026-10-14T00:22:45Z INFO api slow request took 4.2s
+2026-10-14T00:22:52Z ERROR scheduler tick
+2026-10-14T00:22:59Z INFO api connection reset by peer
+2026-10-14T00:23:06Z DEBUG worker job finished
+2026-10-14T00:23:13Z CRITICAL worker job finished
+2026-10-14T00:23:20Z ERROR storage disk usage above 85 percent
+2026-10-14T00:23:27Z WARN auth signature mismatch
+2026-10-14T00:23:34Z ERROR worker queue depth above threshold
+2026-10-14T00:23:41Z INFO worker job retried
+2026-10-14T00:23:48Z DEBUG scheduler cron entry skipped
+2026-10-14T00:23:55Z INFO scheduler cron entry skipped
+2026-10-14T00:24:02Z ERROR api request completed
+2026-10-14T00:24:09Z INFO storage checksum mismatch
+2026-10-14T00:24:16Z ERROR worker lease expired
+2026-10-14T00:24:23Z ERROR auth token validated
+2026-10-14T00:24:30Z WARN api upstream returned 503
+2026-10-14T00:24:37Z INFO auth token expired
+2026-10-14T00:24:44Z INFO worker lease expired
+2026-10-14T00:24:51Z INFO auth signature mismatch
+2026-10-14T00:24:58Z INFO api slow request took 4.2s
+2026-10-14T00:25:05Z DEBUG storage segment flushed
+2026-10-14T00:25:12Z INFO storage compaction finished
+2026-10-14T00:25:19Z WARN storage checksum mismatch
+2026-10-14T00:25:26Z CRITICAL worker queue depth above threshold
+2026-10-14T00:25:33Z ERROR scheduler tick
+2026-10-14T00:25:40Z INFO api connection reset by peer
+2026-10-14T00:25:47Z WARN api payload rejected
+2026-10-14T00:25:54Z INFO worker queue depth above threshold
+2026-10-14T00:26:01Z INFO worker job retried
+2026-10-14T00:26:08Z DEBUG storage compaction finished
+2026-10-14T00:26:15Z INFO api connection reset by peer
+2026-10-14T00:26:22Z WARN api payload rejected
+2026-10-14T00:26:29Z INFO worker lease expired
+2026-10-14T00:26:36Z CRITICAL worker lease expired
+2026-10-14T00:26:43Z INFO worker job retried
+2026-10-14T00:26:50Z ERROR worker lease expired
+2026-10-14T00:26:57Z DEBUG worker job finished
+2026-10-14T00:27:04Z DEBUG api payload rejected
+2026-10-14T00:27:11Z WARN scheduler no work available
+2026-10-14T00:27:18Z ERROR api upstream returned 503
+2026-10-14T00:27:25Z ERROR api connection reset by peer
+
+2026-10-14T00:27:32Z ERROR worker job finished
+2026-10-14T00:27:39Z INFO worker job finished
+2026-10-14T00:27:46Z CRITICAL worker lease expired
+2026-10-14T00:27:53Z ERROR scheduler cron entry skipped
+2026-10-14T00:28:00Z INFO api upstream returned 503
+2026-10-14T00:28:07Z CRITICAL auth token validated
+2026-10-14T00:28:14Z WARN storage disk usage above 85 percent
+2026-10-14T00:28:21Z CRITICAL api slow request took 4.2s
+2026-10-14T00:28:21Z TRACE api unknown level was logged
+2026-10-14T00:28:28Z DEBUG api request completed
+2026-10-14T00:28:35Z CRITICAL storage compaction finished
+2026-10-14T00:28:42Z ERROR worker lease expired
+2026-10-14T00:28:49Z DEBUG api slow request took 4.2s
+2026-10-14T00:28:56Z WARN storage disk usage above 85 percent
+2026-10-14T00:29:03Z INFO api payload rejected
+2026-10-14T00:29:10Z INFO worker job finished
+2026-10-14T00:29:17Z DEBUG worker queue depth above threshold
+2026-10-14T00:29:24Z INFO api request completed
+2026-10-14T00:29:31Z ERROR auth token validated
+2026-10-14T00:29:38Z ERROR worker job retried
+2026-10-14T00:29:45Z INFO auth token expired
+2026-10-14T00:29:52Z INFO storage disk usage above 85 percent
+2026-10-14T00:29:59Z CRITICAL auth token expired
+2026-10-14T00:30:06Z INFO storage checksum mismatch
+2026-10-14T00:30:13Z CRITICAL api connection reset by peer
+2026-10-14T00:30:20Z INFO storage checksum mismatch
+2026-10-14T00:30:27Z INFO worker queue depth above threshold
+2026-10-14T00:30:34Z DEBUG auth token validated
+2026-10-14T00:30:41Z ERROR api payload rejected
+2026-10-14T00:30:48Z CRITICAL auth token validated
+2026-10-14T00:30:55Z INFO api request completed
+2026-10-14T00:31:02Z DEBUG worker job retried
+2026-10-14T00:31:09Z DEBUG api connection reset by peer
+2026-10-14T00:31:16Z WARN api upstream returned 503
+2026-10-14T00:31:23Z INFO api request completed
+2026-10-14T00:31:30Z ERROR api slow request took 4.2s
+2026-10-14T00:31:37Z ERROR worker job retried
+2026-10-14T00:31:44Z INFO api connection reset by peer
+2026-10-14T00:31:44Z WARN api
+2026-10-14T00:31:51Z WARN storage checksum mismatch
+2026-10-14T00:31:58Z INFO api slow request took 4.2s
+2026-10-14T00:32:05Z INFO api connection reset by peer
+2026-10-14T00:32:12Z ERROR scheduler lock contention
+2026-10-14T00:32:19Z DEBUG scheduler cron entry skipped
+2026-10-14T00:32:26Z INFO storage disk usage above 85 percent
+2026-10-14T00:32:33Z WARN scheduler cron entry skipped
+2026-10-14T00:32:40Z INFO api request completed
+2026-10-14T00:32:47Z CRITICAL worker queue depth above threshold
+2026-10-14T00:32:54Z ERROR api upstream returned 503
+2026-10-14T00:33:01Z WARN scheduler tick
+2026-10-14T00:33:08Z ERROR auth token validated
+2026-10-14T00:33:15Z WARN storage checksum mismatch
+2026-10-14T00:33:22Z INFO api payload rejected
+2026-10-14T00:33:29Z WARN storage compaction finished
+2026-10-14T00:33:36Z WARN storage segment flushed
+2026-10-14T00:33:43Z ERROR storage segment flushed
+2026-10-14T00:33:50Z WARN scheduler cron entry skipped
+2026-10-14T00:33:57Z INFO scheduler cron entry skipped
+2026-10-14T00:34:04Z DEBUG storage compaction finished
+2026-10-14T00:34:11Z CRITICAL auth signature mismatch
+2026-10-14T00:34:18Z DEBUG auth token expired
+2026-10-14T00:34:25Z INFO api payload rejected
+2026-10-14T00:34:32Z INFO api connection reset by peer
+2026-10-14T00:34:39Z ERROR scheduler no work available
+2026-10-14T00:34:46Z INFO auth token expired
+2026-10-14T00:34:53Z ERROR scheduler no work available
+2026-10-14T00:35:00Z INFO api request completed
+2026-10-14T00:35:07Z ERROR storage segment flushed
+2026-10-14T00:35:14Z INFO scheduler cron entry skipped
+2026-10-14T00:35:21Z ERROR worker job finished
+2026-10-14T00:35:28Z INFO api request completed
+2026-10-14T00:35:35Z CRITICAL api upstream returned 503
+2026-10-14T00:35:42Z DEBUG api upstream returned 503
+2026-10-14T00:35:49Z ERROR worker job finished
+2026-10-14T00:35:56Z INFO storage segment flushed
+2026-10-14T00:36:03Z WARN api upstream returned 503
+2026-10-14T00:36:10Z INFO api slow request took 4.2s
+2026-10-14T00:36:17Z ERROR worker job retried
+2026-10-14T00:36:24Z CRITICAL storage disk usage above 85 percent
+2026-10-14T00:36:31Z INFO storage checksum mismatch
+2026-10-14T00:36:38Z INFO worker job retried
+2026-10-14T00:36:45Z WARN storage checksum mismatch
+2026-10-14T00:36:52Z DEBUG storage disk usage above 85 percent
+2026-10-14T00:36:59Z ERROR storage disk usage above 85 percent
+2026-10-14T00:37:06Z DEBUG scheduler no work available
+2026-10-14T00:37:13Z INFO worker queue depth above threshold
+2026-10-14T00:37:20Z INFO api connection reset by peer
+2026-10-14T00:37:27Z INFO api payload rejected
+2026-10-14T00:37:34Z CRITICAL api payload rejected
+2026-10-14T00:37:41Z INFO api request completed
+2026-10-14T00:37:48Z INFO api connection reset by peer
+2026-10-14T00:37:55Z INFO worker queue depth above threshold
+2026-10-14T00:38:02Z DEBUG storage checksum mismatch
+2026-10-14T00:38:09Z CRITICAL scheduler no work available
+2026-10-14T00:38:16Z WARN storage compaction finished
+2026-10-14T00:38:23Z ERROR api upstream returned 503
+2026-10-14T00:38:30Z CRITICAL storage disk usage above 85 percent
+2026-10-14T00:38:37Z DEBUG api slow request took 4.2s
+  continuation of the previous entry, indented text
+2026-10-14T00:38:44Z ERROR auth signature mismatch
+
+2026-10-14T00:38:51Z INFO api request completed
+2026-10-14T00:38:58Z INFO auth token validated
+2026-10-14T00:39:05Z INFO storage checksum mismatch
+2026-10-14T00:39:12Z CRITICAL storage checksum mismatch
+2026-10-14T00:39:19Z INFO worker queue depth above threshold
+2026-10-14T00:39:26Z CRITICAL scheduler cron entry skipped
+2026-10-14T00:39:33Z WARN worker job finished
+2026-10-14T00:39:40Z ERROR scheduler no work available
+2026-10-14T00:39:47Z INFO api request completed
+2026-10-14T00:39:54Z CRITICAL scheduler tick
+2026-10-14T00:40:01Z INFO worker job finished
+2026-10-14T00:40:08Z INFO api upstream returned 503
+2026-10-14T00:40:15Z INFO auth token validated
+2026-10-14T00:40:22Z CRITICAL worker job finished
+2026-10-14T00:40:29Z ERROR auth token expired
+2026-10-14T00:40:36Z INFO auth token validated
+2026-10-14T00:40:43Z ERROR worker job retried
+2026-10-14T00:40:50Z INFO worker job finished
+2026-10-14T00:40:57Z INFO worker lease expired
+2026-10-14T00:41:04Z WARN api payload rejected
+2026-10-14T00:41:11Z ERROR worker lease expired
+2026-10-14T00:41:18Z INFO api connection reset by peer
+2026-10-14T00:41:25Z DEBUG storage checksum mismatch
+2026-10-14T00:41:32Z INFO scheduler cron entry skipped
+2026-10-14T00:41:32Z TRACE scheduler unknown level was logged
+2026-10-14T00:41:39Z CRITICAL api connection reset by peer
+2026-10-14T00:41:46Z DEBUG auth token validated
+2026-10-14T00:41:53Z INFO api request completed
+2026-10-14T00:42:00Z DEBUG worker queue depth above threshold
+2026-10-14T00:42:07Z INFO storage segment flushed
+2026-10-14T00:42:07Z WARN storage
+2026-10-14T00:42:14Z CRITICAL auth signature mismatch
+2026-10-14T00:42:21Z INFO api request completed
+2026-10-14T00:42:28Z ERROR api slow request took 4.2s
+2026-10-14T00:42:35Z DEBUG api connection reset by peer
+2026-10-14T00:42:42Z ERROR api request completed
+2026-10-14T00:42:49Z INFO api upstream returned 503
+2026-10-14T00:42:56Z INFO storage segment flushed
+2026-10-14T00:43:03Z DEBUG api payload rejected
+2026-10-14T00:43:10Z INFO auth token validated
+2026-10-14T00:43:17Z ERROR api upstream returned 503
+2026-10-14T00:43:24Z DEBUG api upstream returned 503
+2026-10-14T00:43:31Z INFO worker queue depth above threshold
+2026-10-14T00:43:38Z ERROR storage checksum mismatch
+2026-10-14T00:43:45Z ERROR auth token validated
+2026-10-14T00:43:52Z ERROR scheduler tick
+2026-10-14T00:43:59Z ERROR api request completed
+2026-10-14T00:44:06Z INFO worker queue depth above threshold
+2026-10-14T00:44:13Z CRITICAL api upstream returned 503
+2026-10-14T00:44:20Z CRITICAL api connection reset by peer
+2026-10-14T00:44:27Z WARN api upstream returned 503
+2026-10-14T00:44:34Z CRITICAL worker queue depth above threshold
+2026-10-14T00:44:41Z INFO scheduler lock contention
+2026-10-14T00:44:48Z INFO scheduler tick
+2026-10-14T00:44:55Z CRITICAL storage compaction finished
+2026-10-14T00:45:02Z DEBUG worker lease expired
+2026-10-14T00:45:09Z ERROR api upstream returned 503
+2026-10-14T00:45:16Z DEBUG worker job finished
+2026-10-14T00:45:23Z INFO storage checksum mismatch
+2026-10-14T00:45:30Z INFO worker lease expired
+2026-10-14T00:45:37Z INFO scheduler no work available
+2026-10-14T00:45:44Z CRITICAL api request completed
+2026-10-14T00:45:51Z WARN api connection reset by peer
+2026-10-14T00:45:58Z INFO api request completed
+2026-10-14T00:46:05Z DEBUG api slow request took 4.2s
+2026-10-14T00:46:12Z INFO worker job retried
+2026-10-14T00:46:19Z WARN scheduler no work available
+2026-10-14T00:46:26Z INFO api payload rejected
+2026-10-14T00:46:33Z ERROR api connection reset by peer
+2026-10-14T00:46:40Z ERROR api connection reset by peer
+2026-10-14T00:46:47Z ERROR api slow request took 4.2s
+2026-10-14T00:46:54Z WARN worker lease expired
+2026-10-14T00:47:01Z INFO storage disk usage above 85 percent
+2026-10-14T00:47:08Z CRITICAL worker lease expired
+2026-10-14T00:47:15Z INFO api upstream returned 503
+2026-10-14T00:47:22Z ERROR worker lease expired
+2026-10-14T00:47:29Z INFO storage checksum mismatch
+2026-10-14T00:47:36Z ERROR scheduler no work available
+2026-10-14T00:47:43Z INFO storage disk usage above 85 percent
+2026-10-14T00:47:50Z INFO worker job retried
+2026-10-14T00:47:57Z CRITICAL api request completed
+2026-10-14T00:48:04Z INFO storage disk usage above 85 percent
+2026-10-14T00:48:11Z INFO auth signature mismatch
+2026-10-14T00:48:18Z ERROR api connection reset by peer
+2026-10-14T00:48:25Z DEBUG worker job retried
+2026-10-14T00:48:32Z ERROR api connection reset by peer
+2026-10-14T00:48:39Z INFO auth signature mismatch
+2026-10-14T00:48:46Z INFO api payload rejected
+2026-10-14T00:48:53Z CRITICAL worker job retried
+2026-10-14T00:49:00Z CRITICAL storage disk usage above 85 percent
+2026-10-14T00:49:07Z DEBUG api request completed
+2026-10-14T00:49:14Z ERROR worker job retried
+2026-10-14T00:49:21Z ERROR worker job retried
+2026-10-14T00:49:28Z ERROR api payload rejected
+2026-10-14T00:49:35Z DEBUG api slow request took 4.2s
+2026-10-14T00:49:42Z CRITICAL api request completed
+2026-10-14T00:49:49Z ERROR auth token expired
+2026-10-14T00:49:56Z DEBUG scheduler lock contention
+2026-10-14T00:50:03Z WARN api request completed
+
+2026-10-14T00:50:10Z ERROR api upstream returned 503
+2026-10-14T00:50:17Z CRITICAL worker lease expired
+2026-10-14T00:50:24Z ERROR scheduler cron entry skipped
+2026-10-14T00:50:31Z WARN api connection reset by peer
+2026-10-14T00:50:38Z ERROR api payload rejected
+2026-10-14T00:50:45Z INFO api upstream returned 503
+2026-10-14T00:50:52Z DEBUG storage checksum mismatch
+2026-10-14T00:50:59Z WARN worker job finished
+2026-10-14T00:51:06Z ERROR api request completed
+2026-10-14T00:51:13Z INFO api connection reset by peer
+2026-10-14T00:51:20Z WARN auth token expired
+2026-10-14T00:51:27Z INFO worker job retried
+2026-10-14T00:51:34Z WARN api slow request took 4.2s
+2026-10-14T00:51:41Z DEBUG api upstream returned 503
+2026-10-14T00:51:48Z INFO api connection reset by peer
+2026-10-14T00:51:55Z INFO api request completed
+2026-10-14T00:52:02Z DEBUG auth signature mismatch
+2026-10-14T00:52:09Z ERROR api slow request took 4.2s
+2026-10-14T00:52:16Z INFO api request completed
+2026-10-14T00:52:23Z ERROR storage compaction finished
+2026-10-14T00:52:30Z CRITICAL api payload rejected
+2026-10-14T00:52:30Z WARN api
+2026-10-14T00:52:37Z INFO api request completed
+2026-10-14T00:52:44Z INFO api connection reset by peer
+2026-10-14T00:52:51Z INFO worker lease expired
+2026-10-14T00:52:58Z ERROR auth token validated
+2026-10-14T00:53:05Z INFO auth token validated
+2026-10-14T00:53:12Z INFO api request completed
+2026-10-14T00:53:19Z DEBUG api payload rejected
+2026-10-14T00:53:26Z DEBUG api payload rejected
+2026-10-14T00:53:33Z INFO worker job retried
+2026-10-14T00:53:40Z CRITICAL api connection reset by peer
+2026-10-14T00:53:47Z WARN api upstream returned 503
+2026-10-14T00:53:54Z ERROR worker job retried
+2026-10-14T00:54:01Z ERROR scheduler cron entry skipped
+2026-10-14T00:54:08Z INFO storage compaction finished
+2026-10-14T00:54:15Z INFO api request completed
+2026-10-14T00:54:22Z INFO storage checksum mismatch
+2026-10-14T00:54:29Z INFO api request completed
+2026-10-14T00:54:36Z INFO worker lease expired
+2026-10-14T00:54:43Z INFO scheduler tick
+2026-10-14T00:54:43Z TRACE scheduler unknown level was logged
+2026-10-14T00:54:50Z ERROR storage disk usage above 85 percent
+2026-10-14T00:54:57Z CRITICAL storage checksum mismatch
+2026-10-14T00:55:04Z INFO storage disk usage above 85 percent
+2026-10-14T00:55:11Z INFO worker queue depth above threshold
+2026-10-14T00:55:18Z CRITICAL worker lease expired
+2026-10-14T00:55:25Z CRITICAL api payload rejected
+2026-10-14T00:55:32Z DEBUG storage checksum mismatch
+2026-10-14T00:55:39Z INFO api connection reset by peer
+2026-10-14T00:55:46Z CRITICAL api upstream returned 503
+2026-10-14T00:55:53Z DEBUG scheduler lock contention
+2026-10-14T00:56:00Z DEBUG worker queue depth above threshold
+2026-10-14T00:56:07Z WARN auth token validated
+2026-10-14T00:56:14Z WARN scheduler no work available
+  continuation of the previous entry, indented text
+2026-10-14T00:56:21Z DEBUG api request completed
+2026-10-14T00:56:28Z INFO worker queue depth above threshold
+2026-10-14T00:56:35Z ERROR api payload rejected
+2026-10-14T00:56:42Z WARN api upstream returned 503
+2026-10-14T00:56:49Z CRITICAL api payload rejected
+2026-10-14T00:56:56Z INFO auth token validated
+2026-10-14T00:57:03Z INFO api payload rejected
+2026-10-14T00:57:10Z WARN worker job retried
+2026-10-14T00:57:17Z ERROR storage segment flushed
+2026-10-14T00:57:24Z INFO auth signature mismatch
+2026-10-14T00:57:31Z INFO api slow request took 4.2s
+2026-10-14T00:57:38Z ERROR worker job finished
+2026-10-14T00:57:45Z ERROR storage segment flushed
+2026-10-14T00:57:52Z CRITICAL auth token validated
+2026-10-14T00:57:59Z INFO storage segment flushed
+2026-10-14T00:58:06Z INFO api upstream returned 503
+2026-10-14T00:58:13Z INFO storage disk usage above 85 percent
+2026-10-14T00:58:20Z ERROR api upstream returned 503
+2026-10-14T00:58:27Z CRITICAL worker queue depth above threshold
+2026-10-14T00:58:34Z ERROR auth token expired
+2026-10-14T00:58:41Z INFO storage disk usage above 85 percent
+2026-10-14T00:58:48Z DEBUG api upstream returned 503
+2026-10-14T00:58:55Z WARN worker job retried
+2026-10-14T00:59:02Z INFO scheduler no work available
+2026-10-14T00:59:09Z DEBUG scheduler lock contention
+2026-10-14T00:59:16Z ERROR api slow request took 4.2s
+2026-10-14T00:59:23Z CRITICAL scheduler cron entry skipped
+2026-10-14T00:59:30Z CRITICAL worker lease expired
+2026-10-14T00:59:37Z WARN storage checksum mismatch
+2026-10-14T00:59:44Z INFO api connection reset by peer
+2026-10-14T00:59:51Z INFO worker job finished
+2026-10-14T00:59:58Z INFO api upstream returned 503
+2026-10-14T01:00:05Z WARN api request completed
+2026-10-14T01:00:12Z INFO worker queue depth above threshold
+2026-10-14T01:00:19Z ERROR storage checksum mismatch
+2026-10-14T01:00:26Z INFO auth token validated
+2026-10-14T01:00:33Z CRITICAL scheduler cron entry skipped
+2026-10-14T01:00:40Z DEBUG auth signature mismatch
+2026-10-14T01:00:47Z INFO worker queue depth above threshold
+2026-10-14T01:00:54Z DEBUG worker lease expired
+2026-10-14T01:01:01Z INFO api payload rejected
+2026-10-14T01:01:08Z ERROR auth token expired
+2026-10-14T01:01:15Z WARN api upstream returned 503
+2026-10-14T01:01:22Z INFO api request completed
+
+2026-10-14T01:01:29Z ERROR api upstream returned 503
+2026-10-14T01:01:36Z INFO storage segment flushed
+2026-10-14T01:01:43Z INFO auth token expired
+2026-10-14T01:01:50Z ERROR api request completed
+2026-10-14T01:01:57Z INFO api payload rejected
+2026-10-14T01:02:04Z ERROR storage checksum mismatch
+2026-10-14T01:02:11Z WARN auth token expired
+2026-10-14T01:02:18Z DEBUG api upstream returned 503
+2026-10-14T01:02:25Z INFO storage compaction finished
+2026-10-14T01:02:32Z CRITICAL auth signature mismatch
+2026-10-14T01:02:39Z DEBUG api request completed
+2026-10-14T01:02:46Z INFO api request completed
+2026-10-14T01:02:53Z DEBUG api slow request took 4.2s
+2026-10-14T01:02:53Z WARN api
+2026-10-14T01:03:00Z CRITICAL scheduler tick
+2026-10-14T01:03:07Z DEBUG storage segment flushed
+2026-10-14T01:03:14Z CRITICAL worker job finished
+2026-10-14T01:03:21Z INFO api payload rejected
+2026-10-14T01:03:28Z WARN auth signature mismatch
+2026-10-14T01:03:35Z ERROR api payload rejected
+2026-10-14T01:03:42Z INFO api upstream returned 503
+2026-10-14T01:03:49Z INFO storage segment flushed
+2026-10-14T01:03:56Z ERROR storage disk usage above 85 percent
+2026-10-14T01:04:03Z INFO storage disk usage above 85 percent
+2026-10-14T01:04:10Z DEBUG auth token expired
+2026-10-14T01:04:17Z ERROR storage segment flushed
+2026-10-14T01:04:24Z DEBUG worker job retried
+2026-10-14T01:04:31Z WARN storage segment flushed
+2026-10-14T01:04:38Z INFO auth token expired
+2026-10-14T01:04:45Z ERROR api request completed
+2026-10-14T01:04:52Z CRITICAL storage disk usage above 85 percent
+2026-10-14T01:04:59Z INFO api connection reset by peer
+2026-10-14T01:05:06Z CRITICAL worker job finished
+2026-10-14T01:05:13Z WARN storage disk usage above 85 percent
+2026-10-14T01:05:20Z ERROR auth token expired
+2026-10-14T01:05:27Z ERROR api payload rejected
+2026-10-14T01:05:34Z CRITICAL api slow request took 4.2s
+2026-10-14T01:05:41Z INFO api upstream returned 503
+2026-10-14T01:05:48Z ERROR storage compaction finished
+2026-10-14T01:05:55Z ERROR api upstream returned 503
+2026-10-14T01:06:02Z INFO auth signature mismatch
+2026-10-14T01:06:09Z INFO scheduler lock contention
+2026-10-14T01:06:16Z CRITICAL api connection reset by peer
+2026-10-14T01:06:23Z DEBUG auth token validated
+2026-10-14T01:06:30Z WARN api slow request took 4.2s
+2026-10-14T01:06:37Z CRITICAL auth token expired
+2026-10-14T01:06:44Z INFO worker queue depth above threshold
+2026-10-14T01:06:51Z CRITICAL api upstream returned 503
+2026-10-14T01:06:58Z INFO worker job finished
+2026-10-14T01:07:05Z ERROR scheduler lock contention
+2026-10-14T01:07:12Z CRITICAL scheduler cron entry skipped
+2026-10-14T01:07:19Z ERROR api payload rejected
+2026-10-14T01:07:26Z INFO api payload rejected
+2026-10-14T01:07:33Z ERROR api connection reset by peer
+2026-10-14T01:07:40Z INFO scheduler tick
+2026-10-14T01:07:47Z INFO api upstream returned 503
+2026-10-14T01:07:54Z CRITICAL api connection reset by peer
+2026-10-14T01:07:54Z TRACE api unknown level was logged
+2026-10-14T01:08:01Z INFO api connection reset by peer
+2026-10-14T01:08:08Z DEBUG api upstream returned 503
+2026-10-14T01:08:15Z DEBUG api request completed
+2026-10-14T01:08:22Z WARN api slow request took 4.2s
+2026-10-14T01:08:29Z WARN api payload rejected
+2026-10-14T01:08:36Z INFO worker job retried
+2026-10-14T01:08:43Z INFO api request completed
+2026-10-14T01:08:50Z INFO storage segment flushed
+2026-10-14T01:08:57Z ERROR worker lease expired
+2026-10-14T01:09:04Z CRITICAL storage checksum mismatch
+2026-10-14T01:09:11Z ERROR api connection reset by peer
+2026-10-14T01:09:18Z ERROR worker lease expired
+2026-10-14T01:09:25Z INFO worker queue depth above threshold
+2026-10-14T01:09:32Z INFO auth token expired
+2026-10-14T01:09:39Z INFO storage checksum mismatch
+2026-10-14T01:09:46Z INFO api payload rejected
+2026-10-14T01:09:53Z WARN scheduler tick
+2026-10-14T01:10:00Z DEBUG storage segment flushed
+2026-10-14T01:10:07Z ERROR auth signature mismatch
+2026-10-14T01:10:14Z INFO auth token validated
+2026-10-14T01:10:21Z INFO storage checksum mismatch
+2026-10-14T01:10:28Z ERROR worker job finished
+2026-10-14T01:10:35Z DEBUG storage disk usage above 85 percent
+2026-10-14T01:10:42Z CRITICAL worker job retried
+2026-10-14T01:10:49Z INFO api request completed
+2026-10-14T01:10:56Z INFO api connection reset by peer
+2026-10-14T01:11:03Z CRITICAL storage checksum mismatch
+2026-10-14T01:11:10Z INFO auth token validated
+2026-10-14T01:11:17Z INFO storage segment flushed
+2026-10-14T01:11:24Z DEBUG worker job finished
+2026-10-14T01:11:31Z INFO api request completed
+2026-10-14T01:11:38Z INFO worker queue depth above threshold
+2026-10-14T01:11:45Z WARN api upstream returned 503
+2026-10-14T01:11:52Z ERROR storage disk usage above 85 percent
+2026-10-14T01:11:59Z CRITICAL api connection reset by peer
+2026-10-14T01:12:06Z WARN auth token validated
+2026-10-14T01:12:13Z CRITICAL api upstream returned 503

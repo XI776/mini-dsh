@@ -273,7 +273,9 @@ class AgentLoop:
                 result = self.model.complete(view, tool_schemas, remaining_time)
             except ModelFailure as exc:
                 usage.add_model(exc.usage)
-                self._append("model_error", usage.steps, {"error": str(exc), "usage": asdict(exc.usage)})
+                self._append("model_error", usage.steps, {
+                    "error": str(exc), "usage": asdict(exc.usage), "attempts": exc.attempts,
+                })
                 return finish(TerminalStatus.FAILED, "model_error")
             except Exception as exc:
                 usage.add_model(Usage(known=False))
@@ -289,6 +291,7 @@ class AgentLoop:
                     "finish": result.finish,
                     "tool_calls": [asdict(call) for call in result.tool_calls],
                     "usage": asdict(result.usage),
+                    "attempts": result.attempts,
                 },
             )
             for index, call in enumerate(result.tool_calls):

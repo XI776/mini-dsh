@@ -7,6 +7,7 @@ import math
 import os
 import re
 import socket
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -19,6 +20,9 @@ from .contracts import ContextView, ModelFailure, ModelResult, ToolCall, Usage
 DEFAULT_BASE_URL = "https://api.deepseek.com"
 DEFAULT_MODEL = "deepseek-flash"
 _FUNCTION_NAME = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+# Provider-side transient conditions. Everything else is treated as deterministic.
+_RETRYABLE_HTTP_CODES = frozenset({408, 429, 500, 502, 503, 504})
+_MAX_BACKOFF_S = 8.0
 
 
 def load_api_key(env_file: Path) -> str:
@@ -120,6 +124,10 @@ class DeepSeekModel:
         pricing: DeepSeekPricing | None = None,
         opener: Callable[..., Any] | None = None,
         max_output_tokens: int | None = None,
+        max_attempts: int = 3,
+        backoff_s: float = 0.5,
+        sleep: Callable[[float], None] | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
         if not api_key.strip():
             raise ValueError("DEEPSEEK_API_KEY is empty")
@@ -129,12 +137,20 @@ class DeepSeekModel:
             raise ValueError("DeepSeek base URL must use HTTPS")
         if max_output_tokens is not None and (type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 393216):
             raise ValueError("max_output_tokens must be an integer between 1 and 393216")
+        if type(max_attempts) is not int or not 1 <= max_attempts <= 10:
+            raise ValueError("max_attempts must be an integer between 1 and 10")
+        if not isinstance(backoff_s, (int, float)) or isinstance(backoff_s, bool) or not math.isfinite(backoff_s) or backoff_s < 0:
+            raise ValueError("backoff_s must be a finite nonnegative number")
         self._api_key = api_key.strip()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.pricing = pricing
         self.max_output_tokens = max_output_tokens
+        self.max_attempts = max_attempts
+        self.backoff_s = float(backoff_s)
         self._opener = opener or urllib.request.urlopen
+        self._sleep = sleep or time.sleep
+        self._clock = clock or time.monotonic
         self.identity = f"deepseek:{model}:{self.base_url}"
 
     @property
@@ -143,7 +159,9 @@ class DeepSeekModel:
 
     def configuration(self) -> dict[str, object]:
         return {"pricing": asdict(self.pricing) if self.pricing is not None else None,
-                "max_output_tokens": self.max_output_tokens}
+                "max_output_tokens": self.max_output_tokens,
+                "max_attempts": self.max_attempts,
+                "backoff_s": self.backoff_s}
 
     def resume_from(self, completed_calls: int) -> None:
         if completed_calls < 0:
@@ -161,6 +179,43 @@ class DeepSeekModel:
                 raise ModelFailure("invalid role in context view", Usage(known=False))
             messages.append({"role": role, "content": str(message.get("content", ""))})
         return ContextView(tuple(messages), view.event_ids, view.strategy, view.metadata)
+
+    def _retry_delay(self, attempt: int, headers: Any) -> float:
+        """Exponential backoff, letting a bounded Retry-After take precedence."""
+        if headers is not None:
+            raw = headers.get("Retry-After")
+            try:
+                if raw is not None and float(raw) >= 0:
+                    return min(float(raw), _MAX_BACKOFF_S)
+            except (TypeError, ValueError):
+                pass
+        return min(self.backoff_s * (2 ** (attempt - 1)), _MAX_BACKOFF_S)
+
+    def _send(self, request: urllib.request.Request, timeout_s: float) -> tuple[bytes, int]:
+        """Send the request, retrying only transient failures inside the caller's time budget."""
+        deadline = self._clock() + timeout_s
+        attempts = 0
+        while True:
+            remaining = deadline - self._clock()
+            if remaining <= 0:
+                raise ModelFailure("DeepSeek request timed out", Usage(known=False), attempts=attempts)
+            attempts += 1
+            try:
+                with self._opener(request, timeout=remaining) as response:
+                    return response.read(4_000_001), attempts
+            except urllib.error.HTTPError as exc:
+                error = exc
+                if exc.code not in _RETRYABLE_HTTP_CODES:
+                    raise ModelFailure(f"DeepSeek HTTP {exc.code}", Usage(known=False), attempts=attempts) from exc
+                message = f"DeepSeek HTTP {exc.code}"
+                delay = self._retry_delay(attempts, exc.headers)
+            except (urllib.error.URLError, socket.timeout, TimeoutError, OSError) as exc:
+                error = exc
+                message = f"DeepSeek transport error: {type(exc).__name__}"
+                delay = self._retry_delay(attempts, None)
+            if attempts >= self.max_attempts or self._clock() + delay >= deadline:
+                raise ModelFailure(message, Usage(known=False), attempts=attempts) from error
+            self._sleep(delay)
 
     def complete(self, view: ContextView, tool_schemas: Sequence[Mapping[str, Any]], timeout_s: float) -> ModelResult:
         if timeout_s <= 0:
@@ -191,39 +246,36 @@ class DeepSeekModel:
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json"},
             method="POST",
         )
+        raw, attempts = self._send(http_request, timeout_s)
         try:
-            with self._opener(http_request, timeout=timeout_s) as response:
-                raw = response.read(4_000_001)
-        except urllib.error.HTTPError as exc:
-            # Response bodies can contain request details. Keep them out of traces.
-            raise ModelFailure(f"DeepSeek HTTP {exc.code}", Usage(known=False)) from exc
-        except (urllib.error.URLError, socket.timeout, TimeoutError, OSError) as exc:
-            raise ModelFailure(f"DeepSeek transport error: {type(exc).__name__}", Usage(known=False)) from exc
-        if len(raw) > 4_000_000:
-            raise ModelFailure("DeepSeek response exceeded size limit", Usage(known=False))
-        try:
-            data = json.loads(raw)
-        except (ValueError, UnicodeError) as exc:
-            raise ModelFailure("DeepSeek returned invalid JSON", Usage(known=False)) from exc
-        if not isinstance(data, dict):
-            raise ModelFailure("DeepSeek response must be an object", Usage(known=False))
-        usage = _usage(data.get("usage"), self.pricing)
-        try:
-            choice = data["choices"][0]
-            message = choice["message"]
-            reason = choice["finish_reason"]
-            calls = []
-            for item in message.get("tool_calls") or []:
-                function = item["function"]
-                name = reverse[function["name"]]
-                arguments = json.loads(function["arguments"])
-                if not isinstance(arguments, dict):
-                    raise ValueError("tool arguments must be an object")
-                calls.append(ToolCall(name, arguments, str(item["id"])))
-            if reason == "tool_calls" and calls:
-                return ModelResult(str(message.get("content") or ""), tuple(calls), False, usage)
-            if reason == "stop" and not calls:
-                return ModelResult(str(message.get("content") or ""), (), True, usage)
-            raise ValueError(f"unsupported finish reason: {reason}")
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
-            raise ModelFailure(f"invalid DeepSeek completion: {exc}", usage) from exc
+            if len(raw) > 4_000_000:
+                raise ModelFailure("DeepSeek response exceeded size limit", Usage(known=False))
+            try:
+                data = json.loads(raw)
+            except (ValueError, UnicodeError) as exc:
+                raise ModelFailure("DeepSeek returned invalid JSON", Usage(known=False)) from exc
+            if not isinstance(data, dict):
+                raise ModelFailure("DeepSeek response must be an object", Usage(known=False))
+            usage = _usage(data.get("usage"), self.pricing)
+            try:
+                choice = data["choices"][0]
+                message = choice["message"]
+                reason = choice["finish_reason"]
+                calls = []
+                for item in message.get("tool_calls") or []:
+                    function = item["function"]
+                    name = reverse[function["name"]]
+                    arguments = json.loads(function["arguments"])
+                    if not isinstance(arguments, dict):
+                        raise ValueError("tool arguments must be an object")
+                    calls.append(ToolCall(name, arguments, str(item["id"])))
+                if reason == "tool_calls" and calls:
+                    return ModelResult(str(message.get("content") or ""), tuple(calls), False, usage, attempts)
+                if reason == "stop" and not calls:
+                    return ModelResult(str(message.get("content") or ""), (), True, usage, attempts)
+                raise ValueError(f"unsupported finish reason: {reason}")
+            except (KeyError, IndexError, TypeError, ValueError) as exc:
+                raise ModelFailure(f"invalid DeepSeek completion: {exc}", usage) from exc
+        except ModelFailure as exc:
+            # Reply parsing is deterministic: no retry, but keep the attempt count visible.
+            raise ModelFailure(str(exc), exc.usage, attempts=attempts) from exc

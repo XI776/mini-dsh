@@ -38,6 +38,8 @@ Manifest 中不记录 API Key。模型配置中的外部命令只存 argv 哈希
 
 新版模型 Usage 保留提供方原始字段 `raw_usage` 与费用来源 `cost_source`（`reported`、`estimated`、`synthetic`）。脚本模型的成本值默认标为 `synthetic`，不进入实报或价格快照估算。旧 Trace 没有这些字段，继续按旧 schema 回读；其历史 `recorded_cost` 字段可能混合估算和实报，不应直接用于成本结论。新版 manifest 使用 `cost_accounting_version: 2`，校验器按版本重建费用字段。
 
+DeepSeek 适配器对 408、429、5xx 与传输错误做有界重试（默认最多 3 次尝试、指数退避、单次请求不超过本步剩余超时），尝试次数记录在 `model_response` / `model_error` 的 `attempts` 字段。失败的尝试不返回 Usage，因此不进入本地 Token 与费用统计；但供应商是否对已受理后中断的请求计费无法从响应观察，本地统计始终是"成功响应之和"，不是账单。传输层重试也无法区分"请求未送达"与"响应丢失后重发"，后者可能被供应商计费两次。价格快照估算同样只覆盖已记录的成功响应。
+
 ## 验证
 
 运行 `uv run agent-harness experiment-verify <实验目录>`。校验器核对运行矩阵、策略轮换、Trace 与记录、测试结论、摘要聚合、模型/Context 快照、价格快照哈希和仍可访问的输入源哈希。缺少测试、Trace 或完整终态会报错；实验未完成会报 `incomplete_experiment`。输入源不可访问时仍可检查保存的快照与 Trace，但不能再次确认源文件未变化。旧版实验 schema 1 支持回读，可能没有输入快照。

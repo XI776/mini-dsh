@@ -126,7 +126,7 @@ class DeepSeekTests(unittest.TestCase):
         sent = json.loads(requests[0][0].data)
         self.assertEqual(sent["tools"][0]["function"]["name"], "tool_0")
         self.assertEqual(sent["messages"][1]["role"], "user")
-        self.assertEqual(requests[0][1], 12.0)
+        self.assertAlmostEqual(requests[0][1], 12.0, places=3)
         self.assertNotIn("test-secret", json.dumps(sent))
 
     def test_bad_completion_keeps_reported_usage(self) -> None:
@@ -150,6 +150,121 @@ class DeepSeekTests(unittest.TestCase):
         result = model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 1)
         self.assertIsNone(result.usage.cost_usd)
         self.assertFalse(result.usage.cache_usage_known)
+
+    def test_transient_http_error_is_retried_and_counted(self) -> None:
+        calls = []
+        sleeps = []
+
+        def opener(request, timeout):
+            calls.append(timeout)
+            if len(calls) == 1:
+                raise urllib.error.HTTPError("https://api.deepseek.com", 503, "unavailable", None, None)
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+                                 "usage": {"prompt_tokens": 4, "completion_tokens": 1}})
+
+        model = DeepSeekModel("secret", opener=opener, backoff_s=0.5, sleep=sleeps.append)
+        result = model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 30.0)
+        self.assertTrue(result.finish)
+        self.assertEqual(result.attempts, 2)
+        self.assertEqual(sleeps, [0.5])
+        self.assertLessEqual(calls[1], calls[0])
+
+    def test_retry_stops_at_max_attempts(self) -> None:
+        attempts = []
+
+        def opener(*args, **kwargs):
+            attempts.append(1)
+            raise urllib.error.HTTPError("https://api.deepseek.com", 503, "unavailable", None, None)
+
+        model = DeepSeekModel("secret", opener=opener, max_attempts=2, sleep=lambda _: None)
+        with self.assertRaises(ModelFailure) as failure:
+            model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 30.0)
+        self.assertEqual(str(failure.exception), "DeepSeek HTTP 503")
+        self.assertEqual(failure.exception.attempts, 2)
+        self.assertEqual(len(attempts), 2)
+        self.assertFalse(failure.exception.usage.known)
+
+    def test_retry_never_exceeds_the_caller_time_budget(self) -> None:
+        class FakeClock:
+            def __init__(self):
+                self.now = 0.0
+
+            def __call__(self) -> float:
+                return self.now
+
+            def sleep(self, delay: float) -> None:
+                self.now += delay
+
+        clock = FakeClock()
+        calls = []
+
+        def opener(*args, **kwargs):
+            calls.append(clock.now)
+            raise urllib.error.HTTPError("https://api.deepseek.com", 503, "unavailable", None, None)
+
+        model = DeepSeekModel("secret", opener=opener, backoff_s=1.0, max_attempts=5,
+                              sleep=clock.sleep, clock=clock)
+        with self.assertRaises(ModelFailure) as failure:
+            model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 3.0)
+        # Second backoff would reach the deadline, so the request stops after two attempts.
+        self.assertEqual(failure.exception.attempts, 2)
+        self.assertEqual(calls, [0.0, 1.0])
+        self.assertLessEqual(clock.now, 3.0)
+
+    def test_retry_after_header_bounds_the_backoff(self) -> None:
+        sleeps = []
+
+        def opener(request, timeout):
+            if not sleeps:
+                raise urllib.error.HTTPError("https://api.deepseek.com", 429, "slow down",
+                                             {"Retry-After": "2"}, None)
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+                                 "usage": {"prompt_tokens": 4, "completion_tokens": 1}})
+
+        model = DeepSeekModel("secret", opener=opener, backoff_s=0.1, sleep=sleeps.append)
+        self.assertEqual(model.complete(
+            ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 30.0).attempts, 2)
+        self.assertEqual(sleeps, [2.0])
+
+    def test_client_error_is_not_retried(self) -> None:
+        attempts = []
+
+        def opener(*args, **kwargs):
+            attempts.append(1)
+            raise urllib.error.HTTPError("https://api.deepseek.com", 401, "bad-secret", None, None)
+
+        model = DeepSeekModel("secret", opener=opener, sleep=lambda _: None)
+        with self.assertRaises(ModelFailure) as failure:
+            model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 30.0)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(failure.exception.attempts, 1)
+
+    def test_agent_trace_records_retry_attempts(self) -> None:
+        calls = []
+
+        def opener(request, timeout):
+            calls.append(1)
+            if len(calls) == 1:
+                raise urllib.error.HTTPError("https://api.deepseek.com", 503, "unavailable", None, None)
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+                                 "usage": {"prompt_tokens": 4, "completion_tokens": 1}})
+
+        class Context:
+            name = "full_history"
+
+            def build(self, events, task, token_budget):
+                return ContextView(({"role": "user", "content": task},), (), self.name)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with JsonlSession(Path(directory)) as session:
+                result = AgentLoop(
+                    DeepSeekModel("test-secret", opener=opener, sleep=lambda _: None), Context(),
+                    ToolRuntime([], WorkspacePolicy(), session), session,
+                ).run("task")
+                self.assertEqual(result.status.value, "finished")
+                response = next(event for event in session.events if event.type == "model_response")
+                self.assertEqual(response.payload["attempts"], 2)
+                self.assertTrue(verify_trace(session.root / "trace.jsonl")["ok"])
 
     def test_http_error_excludes_response_body_and_key(self) -> None:
         def opener(*args, **kwargs):

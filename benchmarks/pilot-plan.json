@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "experiment_id": "real-context-pilot",
+  "cases": [
+    "real/duration.json",
+    "real/inventory.json"
+  ],
+  "strategies": [
+    "full_history",
+    "sliding_window",
+    "summary",
+    "repository",
+    "retrieval_summary",
+    "python_symbols"
+  ],
+  "repetitions": 1,
+  "base_seed": 42
+}

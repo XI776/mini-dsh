@@ -1,0 +1,32 @@
+[
+  {
+    "tool_calls": [
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "importer.py",
+          "content": "\"\"\"Row importer used by the nightly load.\n\nReference fix for the text-refactor task: imported names keep their case.\n\"\"\"\n\nfrom util.text import normalize\n\n\ndef import_row(row):\n    \"\"\"Normalize one row from the upstream export.\"\"\"\n    return {\"name\": normalize(row[\"name\"], keep_case=True), \"qty\": int(row[\"qty\"])}\n"
+        }
+      },
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "util/text.py",
+          "content": "\"\"\"Small text helpers shared by the reporting tools.\n\nReference fix for the text-refactor task: `normalize` accepts `keep_case`.\n\"\"\"\n\nimport re\n\n_WHITESPACE = re.compile(r\"\\s+\")\n_EMPTY = re.compile(r\"^$\")\n\n\ndef normalize(value, keep_case=False):\n    \"\"\"Strip, collapse internal whitespace and lowercase a string.\"\"\"\n    if not isinstance(value, str):\n        raise ValueError(\"value must be a string\")\n    collapsed = _WHITESPACE.sub(\" \", value.strip())\n    return collapsed if keep_case else collapsed.lower()\n\n\ndef is_blank(value):\n    \"\"\"Return True when a value is empty after normalization.\"\"\"\n    return bool(_EMPTY.match(normalize(value)))\n"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 40,
+      "output_tokens": 60
+    }
+  },
+  {
+    "message": "Applied the reference fix.",
+    "finish": true,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 8
+    }
+  }
+]

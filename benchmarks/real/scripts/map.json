@@ -1,0 +1,8 @@
+{
+  "config-normalization": "config_migration.json",
+  "duration-parsing": "duration.json",
+  "inventory-tiers": "inventory.json",
+  "log-triage": "logtriage.json",
+  "pipeline-tail": "pipeline.json",
+  "text-keep-case": "textrefactor.json"
+}

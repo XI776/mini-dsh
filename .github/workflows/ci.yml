@@ -29,6 +29,10 @@ jobs:
           uv run --locked agent-harness experiment-seal .runs/experiments/ci-fixtures /tmp/mini-dsh-ci-evidence.json
           uv run --locked agent-harness experiment-export .runs/experiments/ci-fixtures /tmp/mini-dsh-ci-evidence.json /tmp/mini-dsh-ci-evidence.zip
           uv run --locked agent-harness experiment-bundle-verify /tmp/mini-dsh-ci-evidence.zip --trusted-anchor /tmp/mini-dsh-ci-evidence.json
+      - name: Run and verify the real-model fixtures deterministically
+        run: |
+          uv run --locked agent-harness eval-batch --plan benchmarks/real-fixtures-plan.json --script-map benchmarks/real/scripts/map.json --output .runs/experiments/ci-real-fixtures
+          uv run --locked agent-harness experiment-verify .runs/experiments/ci-real-fixtures
       - name: Compile package
         run: uv run --locked python -m compileall -q src/agent_harness
       - name: Check whitespace

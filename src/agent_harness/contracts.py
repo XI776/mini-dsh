@@ -65,14 +65,20 @@ class ModelResult:
     tool_calls: tuple[ToolCall, ...] = ()
     finish: bool = False
     usage: Usage = field(default_factory=Usage)
+    attempts: int = 1
+
+    def __post_init__(self) -> None:
+        if self.attempts < 1:
+            raise ValueError("attempts must be at least 1")
 
 
 class ModelFailure(Exception):
     """A failed model request with any usage reported by the provider."""
 
-    def __init__(self, message: str, usage: Usage | None = None):
+    def __init__(self, message: str, usage: Usage | None = None, attempts: int = 1):
         super().__init__(message)
         self.usage = usage or Usage(known=False)
+        self.attempts = max(1, attempts)
 
 
 @dataclass(frozen=True)

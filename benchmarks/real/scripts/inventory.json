@@ -1,0 +1,25 @@
+[
+  {
+    "tool_calls": [
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "inventory/pricing.py",
+          "content": "\"\"\"Volume discount rules for inventory lines.\n\nReference fix for the inventory-tiers task: tiers use >= boundaries, the tier\nis chosen per line, and line totals round halves up.\n\"\"\"\n\nfrom .models import Item\n\n# (minimum quantity, discount percent), highest tier first\nDISCOUNT_TIERS = ((50, 20), (10, 10))\n\n\ndef tier_percent(quantity):\n    \"\"\"Return the discount percent for a single line quantity.\"\"\"\n    for threshold, percent in DISCOUNT_TIERS:\n        if quantity >= threshold:\n            return percent\n    return 0\n\n\ndef _discounted_total(subtotal_cents, quantity):\n    \"\"\"Apply the tier percent for one quantity to a subtotal.\"\"\"\n    return (subtotal_cents * (100 - tier_percent(quantity)) + 50) // 100\n\n\ndef line_total(price_cents, quantity):\n    \"\"\"Return the discounted total for one line, rounded half up.\"\"\"\n    if price_cents < 0 or quantity < 0:\n        raise ValueError(\"price and quantity must not be negative\")\n    return _discounted_total(price_cents * quantity, quantity)\n\n\ndef summarize(items):\n    \"\"\"Summarize a list of items into subtotal, discount and total cents.\"\"\"\n    subtotal = sum(item.price_cents * item.quantity for item in items)\n    total = sum(line_total(item.price_cents, item.quantity) for item in items)\n    return {\n        \"subtotal_cents\": subtotal,\n        \"discount_cents\": subtotal - total,\n        \"total_cents\": total,\n    }\n"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 40,
+      "output_tokens": 60
+    }
+  },
+  {
+    "message": "Applied the reference fix.",
+    "finish": true,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 8
+    }
+  }
+]

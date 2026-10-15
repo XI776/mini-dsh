@@ -74,10 +74,12 @@ uv run --locked agent-harness trace-diff --report .runs/<left>/trace.jsonl .runs
 `benchmarks/` 包含六类小任务、公开开发测试、运行后才挂载的留出测试和固定脚本动作。`--script-map` 用于验证隔离、指标和完整性，结果不能用于比较策略能力。真实消融把 `--script-map ...` 换成 `--deepseek`，并设置 `--deepseek-pricing`、`--model-label`、固定任务集和足够重复次数；每次用新的输出目录。当前 DeepSeek 适配器不传 seed，重复运行也不保证确定性。详见 [评测协议](docs/evaluation.md)。
 
 ```bash
-uv run --locked agent-harness eval-batch --plan benchmarks/real-plan.json --deepseek --deepseek-model deepseek-flash --deepseek-pricing benchmarks/pricing/deepseek-flash-peak-20261015.json --deepseek-max-output-tokens 4096 --max-estimated-cost-usd 1.0 --output .runs/experiments/real-$(date +%s)
+uv run --locked agent-harness eval-batch --plan benchmarks/real-context-plan.json --deepseek --deepseek-model deepseek-flash --deepseek-pricing benchmarks/pricing/deepseek-flash-peak-20261015.json --deepseek-max-output-tokens 4096 --max-estimated-cost-usd 45 --output .runs/experiments/real-$(date +%s)
 ```
 
-运行前应重新核对价格快照与费用阈值；该命令会发起付费模型请求。
+`benchmarks/real/` 是为 Context 消融准备的真实模型任务集：每个任务是一个小仓库，README 写明契约，公开测试初始失败，留出测试覆盖文档中的每条规则；`benchmarks/pilot-plan.json` 是两任务小批次。费用阈值必须按 `--max-estimated-cost-usd` 的保守估计重新计算，不要沿用示例值。
+
+运行前应重新核对价格快照与费用阈值；该命令会发起付费模型请求。DeepSeek 适配器对 408、429、5xx 与传输错误做有界重试（默认 3 次尝试，指数退避，不超过本步剩余超时），尝试次数写入 `model_response` / `model_error` 的 `attempts` 字段；失败尝试没有 Usage，不计入本地统计，也不代表供应商未计费。
 `eval` 与 `eval-batch` 在开始时把镜像标签解析为本地 `sha256:` 镜像 ID，后续所有容器都按该 ID 启动；Manifest 同时保存来源标签和实际 ID。镜像 ID 只证明本机容器字节一致，跨机器复现还需发布镜像或记录可拉取的仓库摘要。
 `benchmarks/Dockerfile` 现将 Python 基础镜像固定到仓库摘要，构建命令关闭 provenance 元数据；本地重复构建得到相同镜像清单 ID。固定基础镜像的新确定性证据在 `.runs/experiments/pinned-base-20261015`，含输入快照的新版 ZIP 在 `.exports/pinned-base-with-inputs-20261015.zip`。离线镜像在 `.exports/coding-agent-sandbox-pinned-base-20261015.tar`，可用 `sha256sum -c docs/evidence/pinned-base-image.sha256` 检查后再 `docker load -i`。这些 `.exports/` 文件不进入 Git，需另行保存。
 [Trace 差分](docs/trace-diff.md)可分别定位首次输入上下文差异和首次可观察行为差异。

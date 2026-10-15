@@ -1,0 +1,25 @@
+[
+  {
+    "tool_calls": [
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "logtool/summary.py",
+          "content": "\"\"\"Summaries for the on-call log dashboard.\n\nReference implementation for the log-triage task.\n\"\"\"\n\nimport re\n\n_LINE = re.compile(\n    r\"^(?P<timestamp>\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z) \"\n    r\"(?P<level>[A-Z]+) \"\n    r\"(?P<component>[a-z]+) \"\n    r\"(?P<message>\\S.*)$\"\n)\n_LEVELS = (\"DEBUG\", \"INFO\", \"WARN\", \"ERROR\", \"CRITICAL\")\n_ERROR_LEVELS = (\"ERROR\", \"CRITICAL\")\n\n\ndef summarize_errors(path):\n    \"\"\"Summarize the event log at `path`; see README.md for the contract.\"\"\"\n    by_level = {}\n    by_component = {}\n    total_errors = 0\n    malformed = 0\n    first_error = None\n    with open(path, \"r\", encoding=\"utf-8\") as stream:\n        for raw in stream:\n            line = raw.rstrip(\"\\n\")\n            if not line.strip():\n                continue\n            match = _LINE.match(line)\n            if match is None or match.group(\"level\") not in _LEVELS:\n                malformed += 1\n                continue\n            level = match.group(\"level\")\n            component = match.group(\"component\")\n            by_level[level] = by_level.get(level, 0) + 1\n            if level in _ERROR_LEVELS:\n                total_errors += 1\n                by_component[component] = by_component.get(component, 0) + 1\n                if first_error is None:\n                    first_error = match.group(\"message\")\n    return {\n        \"by_level\": by_level,\n        \"by_component\": by_component,\n        \"total_errors\": total_errors,\n        \"malformed\": malformed,\n        \"first_error\": first_error,\n    }\n"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 40,
+      "output_tokens": 60
+    }
+  },
+  {
+    "message": "Applied the reference fix.",
+    "finish": true,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 8
+    }
+  }
+]

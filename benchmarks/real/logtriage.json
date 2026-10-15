@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "case_id": "log-triage",
+  "task": "Implement logtool.summary.summarize_errors for the exported event log, following the contract in README.md, and keep the public tests passing.",
+  "baseline": "logtriage/baseline",
+  "image": "coding-agent-sandbox:1",
+  "public_test": [
+    "python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests"
+  ],
+  "holdout_test": [
+    "python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "/holdout"
+  ],
+  "holdout_files": {
+    "test_hidden.py": "import unittest\n\nfrom logtool.summary import summarize_errors\n\n\nclass HeldOutLogTests(unittest.TestCase):\n    def setUp(self):\n        self.result = summarize_errors(\"data/events.log\")\n\n    def test_level_counts(self):\n        self.assertEqual(self.result[\"by_level\"], {\n            \"DEBUG\": 87, \"INFO\": 235, \"WARN\": 76, \"ERROR\": 133, \"CRITICAL\": 89,\n        })\n\n    def test_component_counts_cover_error_levels_only(self):\n        self.assertEqual(self.result[\"by_component\"], {\n            \"api\": 80, \"auth\": 26, \"scheduler\": 26, \"storage\": 39, \"worker\": 51,\n        })\n\n    def test_error_totals_and_malformed_counts(self):\n        self.assertEqual(self.result[\"total_errors\"], 222)\n        self.assertEqual(self.result[\"malformed\"], 17)\n\n    def test_first_error_message(self):\n        self.assertEqual(self.result[\"first_error\"], \"request completed\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+  },
+  "allowed_commands": [
+    "python"
+  ],
+  "test_timeout_s": 60,
+  "limits": {
+    "steps": 22,
+    "tokens": 140000,
+    "tool_calls": 22,
+    "wall_seconds": 480
+  }
+}

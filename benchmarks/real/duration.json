@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "case_id": "duration-parsing",
+  "task": "duration.parse.parse_duration does not accept every duration shape documented in README.md. Fix the parser and keep the public tests passing.",
+  "baseline": "duration/baseline",
+  "image": "coding-agent-sandbox:1",
+  "public_test": [
+    "python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests"
+  ],
+  "holdout_test": [
+    "python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "/holdout"
+  ],
+  "holdout_files": {
+    "test_hidden.py": "import unittest\n\nfrom duration.parse import parse_duration\n\n\nclass HoldoutTests(unittest.TestCase):\n    def test_multi_segment_values(self):\n        self.assertEqual(parse_duration(\"1h30m15s\"), 5415)\n        self.assertEqual(parse_duration(\"1d12h\"), 129600)\n        self.assertEqual(parse_duration(\"0s\"), 0)\n        self.assertEqual(parse_duration(\"10m\"), 600)\n\n    def test_a_segment_without_a_unit_is_rejected(self):\n        with self.assertRaises(ValueError):\n            parse_duration(\"1h30\")\n\n    def test_uppercase_units_are_rejected(self):\n        with self.assertRaises(ValueError):\n            parse_duration(\"2M\")\n\n    def test_whitespace_only_is_rejected(self):\n        with self.assertRaises(ValueError):\n            parse_duration(\"   \")\n\n    def test_negative_values_are_rejected(self):\n        with self.assertRaises(ValueError):\n            parse_duration(\"-5\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+  },
+  "allowed_commands": [
+    "python"
+  ],
+  "test_timeout_s": 60,
+  "limits": {
+    "steps": 16,
+    "tokens": 80000,
+    "tool_calls": 16,
+    "wall_seconds": 300
+  }
+}

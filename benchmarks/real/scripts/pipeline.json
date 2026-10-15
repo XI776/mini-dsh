@@ -1,0 +1,25 @@
+[
+  {
+    "tool_calls": [
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "pipeline.py",
+          "content": "\"\"\"Nightly record aggregation pipeline.\n\nReference fix for the pipeline-tail task: every record must survive chunking\nand dedupe keeps the first record per id.\n\"\"\"\n\nDEFAULT_CHUNK = 64\n\n\ndef _validate_records(records):\n    \"\"\"Reject records that do not carry the fields the stages rely on.\"\"\"\n    for record in records:\n        if not isinstance(record, dict):\n            raise ValueError(\"records must be dicts\")\n        for field in (\"id\", \"source\", \"count\"):\n            if field not in record:\n                raise ValueError(f\"record is missing {field!r}\")\n\n\ndef chunk(records, size=DEFAULT_CHUNK):\n    \"\"\"Split records into consecutive chunks of at most `size` items.\"\"\"\n    if not isinstance(size, int) or isinstance(size, bool) or size < 1:\n        raise ValueError(\"size must be a positive integer\")\n    return [records[index:index + size] for index in range(0, len(records), size)]\n\n\ndef dedupe(records):\n    \"\"\"Keep one record per id and preserve the input order.\"\"\"\n    seen = {}\n    for record in records:\n        seen.setdefault(record[\"id\"], record)\n    return list(seen.values())\n\n\ndef merge(left, right):\n    \"\"\"Merge two summaries by summing their count fields per id.\"\"\"\n    merged = {}\n    for summary in (left, right):\n        for record_id, count in summary.items():\n            merged[record_id] = merged.get(record_id, 0) + count\n    return merged\n\n\ndef summarize(records):\n    \"\"\"Count records per source and report the aggregate numbers.\"\"\"\n    by_source = {}\n    ids = set()\n    total = 0\n    for record in records:\n        by_source[record[\"source\"]] = by_source.get(record[\"source\"], 0) + 1\n        ids.add(record[\"id\"])\n        total += record[\"count\"]\n    return {\n        \"records\": len(records),\n        \"distinct_ids\": len(ids),\n        \"total_count\": total,\n        \"by_source\": by_source,\n    }\n\n\ndef run(records, size=DEFAULT_CHUNK):\n    \"\"\"Prepare the nightly aggregation and return per-chunk summaries.\"\"\"\n    _validate_records(records)\n    unique = dedupe(records)\n    chunks = chunk(unique, size)\n    summaries = [summarize(group) for group in chunks]\n    return {\n        \"chunks\": summaries,\n        \"records\": sum(item[\"records\"] for item in summaries),\n        \"total_count\": sum(item[\"total_count\"] for item in summaries),\n    }\n"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 40,
+      "output_tokens": 60
+    }
+  },
+  {
+    "message": "Applied the reference fix.",
+    "finish": true,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 8
+    }
+  }
+]

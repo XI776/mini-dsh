@@ -1,0 +1,25 @@
+[
+  {
+    "tool_calls": [
+      {
+        "name": "write_file",
+        "arguments": {
+          "path": "duration/parse.py",
+          "content": "\"\"\"Parse the short duration strings accepted by the scheduler.\n\nReference fix for the duration task: concatenated segments, optional\nsurrounding whitespace, and ValueError for every invalid shape.\n\"\"\"\n\nimport re\n\n_UNITS = {\"s\": 1, \"m\": 60, \"h\": 3600, \"d\": 86400}\n_SEGMENT = re.compile(r\"(\\d+)([smhd]?)\")\n\n\ndef parse_duration(value):\n    \"\"\"Parse a duration such as \"45\", \"90s\" or \"1h30m\" into whole seconds.\"\"\"\n    if not isinstance(value, str):\n        raise ValueError(\"duration must be a string\")\n    text = value.strip()\n    if not text:\n        raise ValueError(\"duration must not be empty\")\n    if text.isdigit():\n        return int(text)\n    total = 0\n    position = 0\n    while position < len(text):\n        match = _SEGMENT.match(text, position)\n        if match is None or not match.group(2):\n            raise ValueError(f\"cannot parse duration {value!r}\")\n        total += int(match.group(1)) * _UNITS[match.group(2)]\n        position = match.end()\n    return total\n"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 40,
+      "output_tokens": 60
+    }
+  },
+  {
+    "message": "Applied the reference fix.",
+    "finish": true,
+    "usage": {
+      "input_tokens": 30,
+      "output_tokens": 8
+    }
+  }
+]
