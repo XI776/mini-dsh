@@ -29,6 +29,10 @@ _V2_ROW_FIELDS = (
     "estimated_cost_usd", "cache_hit_rate", "context_tokens_estimated", "model_identity",
     "context_config", "permission", "evaluation_version",
 )
+_COST_V2_FIELDS = (
+    "unreported_cost_calls", "unestimated_cost_calls", "uncached_input_tokens", "total_billable_tokens",
+    "token_usage_complete",
+)
 
 
 def _same(left: Any, right: Any) -> bool:
@@ -44,7 +48,7 @@ def _trace_path(experiment: Path, row: dict[str, Any]) -> Path | None:
     return next((path for path in candidates if path.is_file()), None)
 
 
-def _from_trace(events: list[dict[str, Any]]) -> dict[str, Any]:
+def _from_trace(events: list[dict[str, Any]], cost_accounting_version: int = 1) -> dict[str, Any]:
     setup = next(event for event in events if event["type"] == "evaluation_setup")
     start = next(event for event in events if event["type"] == "run_started")
     terminal = next(event for event in events if event["type"] == "terminal")
@@ -87,10 +91,27 @@ def _from_trace(events: list[dict[str, Any]]) -> dict[str, Any]:
         "permission": start["payload"].get("permission"),
         "evaluation_version": setup["payload"].get("evaluation_version"),
     })
+    if cost_accounting_version == 2:
+        result.update({
+            "recorded_cost_usd": usage["reported_cost_usd"],
+            "estimated_cost_usd": (
+                usage["estimated_cost_usd"]
+                if usage["unestimated_cost_calls"] == 0 and usage["unknown_usage_calls"] == 0 else None
+            ),
+            "unreported_cost_calls": usage["unreported_cost_calls"],
+            "unestimated_cost_calls": usage["unestimated_cost_calls"],
+            "uncached_input_tokens": (
+                usage["input_tokens"] - usage["cache_read_tokens"] if cache_known else None
+            ),
+            "total_billable_tokens": (
+                usage["input_tokens"] + usage["output_tokens"] if usage["unknown_usage_calls"] == 0 else None
+            ),
+            "token_usage_complete": usage["unknown_usage_calls"] == 0,
+        })
     return result
 
 
-def verify_experiment(directory: Path) -> dict[str, Any]:
+def verify_experiment(directory: Path, *, check_external_sources: bool = True) -> dict[str, Any]:
     directory = Path(directory)
     errors: list[dict[str, Any]] = []
 
@@ -103,7 +124,15 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
         rows = [json.loads(line) for line in (directory / "runs.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         fail("unreadable_experiment", f"{type(exc).__name__}: {exc}")
-        return {"ok": False, "experiment": str(directory), "runs": 0, "traces_verified": 0, "input_snapshots": False, "errors": errors}
+        saved_runs = 0
+        try:
+            saved_manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+            if isinstance(saved_manifest, dict) and saved_manifest.get("status") == "running":
+                fail("incomplete_experiment")
+            saved_runs = sum(bool(line.strip()) for line in (directory / "runs.jsonl").read_text(encoding="utf-8").splitlines())
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            pass
+        return {"ok": False, "experiment": str(directory), "runs": saved_runs, "traces_verified": 0, "input_snapshots": False, "errors": errors}
     if not isinstance(manifest, dict) or manifest.get("schema_version") not in (1, 2) or not isinstance(rows, list) or not isinstance(summary, dict):
         fail("invalid_experiment_schema")
         return {"ok": False, "experiment": str(directory), "runs": len(rows), "traces_verified": 0, "input_snapshots": False, "errors": errors}
@@ -120,6 +149,8 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
 
     snapshots = manifest.get("case_snapshots")
     if version == 2:
+        if manifest.get("cost_accounting_version") not in (None, 2):
+            fail("invalid_cost_accounting_version")
         if not isinstance(snapshots, dict) or not snapshots:
             fail("missing_input_snapshots")
         if manifest.get("status") != "complete" or not manifest.get("started_at") or not manifest.get("completed_at"):
@@ -153,6 +184,9 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
             context_configs = {}
         if manifest.get("strategy_schedule") != "rotate_by_repetition":
             fail("invalid_strategy_schedule")
+        image_resolution = manifest.get("image_resolution")
+        if image_resolution not in (None, "unresolved", "local_image_id"):
+            fail("invalid_image_resolution")
     if snapshots is not None and not isinstance(snapshots, dict):
         fail("invalid_input_snapshots")
         snapshots = None
@@ -164,6 +198,34 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
                 fail("invalid_input_snapshot_hash", f"case_id={case_id}")
     if len(rows) != len(cases) * len(strategies) * repetitions:
         fail("run_count", f"expected={len(cases) * len(strategies) * repetitions}, recorded={len(rows)}")
+    guard = manifest.get("cost_guard") if version == 2 else None
+    if guard is not None:
+        try:
+            rates = manifest["pricing_snapshot"]
+            maximum_rate = max(float(rates[key]) for key in ("cache_hit", "cache_miss", "output"))
+            output_limit = manifest["model_spec"]["max_output_tokens"]
+            if type(output_limit) is not int or output_limit < 1:
+                raise ValueError("invalid output token limit")
+            reserves = {
+                case_id: (2 * snapshot["limits"]["tokens"] + output_limit) * maximum_rate / 1_000_000
+                for case_id, snapshot in snapshots.items()
+            }
+            planned = sum(reserves.values()) * len(strategies) * repetitions
+            if not _same(guard.get("per_case_reserve_usd"), reserves) or not _same(
+                guard.get("planned_conservative_estimate_usd"), planned
+            ) or guard.get("method") != "known_estimate_or_unknown_usage_reserve":
+                fail("cost_guard_snapshot_mismatch")
+            accounted = 0.0
+            for row in rows:
+                value = row.get("estimated_cost_usd")
+                expected = value if value is not None else reserves[row["case_id"]]
+                if not _same(row.get("cost_guard_accounted_usd"), expected):
+                    fail("cost_guard_record_mismatch", run_id=str(row.get("run_id", "")))
+                accounted += expected
+            if accounted > guard["max_estimated_cost_usd"] or planned > guard["max_estimated_cost_usd"]:
+                fail("cost_guard_exceeded")
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            fail("invalid_cost_guard", f"{type(exc).__name__}: {exc}")
 
     case_ids: set[str] = set()
     combinations: set[tuple[str, str, int]] = set()
@@ -201,13 +263,16 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
         verified += 1
         events = read_trace(trace_path)
         try:
-            expected = _from_trace(events)
+            expected = _from_trace(events, manifest.get("cost_accounting_version", 1))
         except (KeyError, StopIteration, TypeError) as exc:
             fail("incomplete_evaluation_trace", f"row={index}; {type(exc).__name__}: {exc}", run_id)
             continue
         if version == 2 and manifest.get("pricing_snapshot") is None:
             expected["estimated_cost_usd"] = None
-        for field in _ROW_FIELDS + (_V2_ROW_FIELDS if version == 2 else ()):
+        fields = _ROW_FIELDS + (_V2_ROW_FIELDS if version == 2 else ())
+        if manifest.get("cost_accounting_version") == 2:
+            fields += _COST_V2_FIELDS
+        for field in fields:
             if not _same(row.get(field), expected[field]):
                 fail("run_record_mismatch", f"row={index}; field={field}", run_id)
         if version == 2 and "model_config" in row and not _same(row["model_config"], expected["model_config"]):
@@ -224,8 +289,10 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
                 fail("model_config_mismatch", f"row={index}", run_id)
             if isinstance(spec, dict) and spec.get("type") == "deepseek":
                 model_config = start.get("model_config", {})
-                if not isinstance(model_config, dict) or model_config.get("pricing") != manifest.get("pricing_snapshot"):
-                    fail("model_config_mismatch", f"row={index}; pricing", run_id)
+                if (not isinstance(model_config, dict)
+                        or model_config.get("pricing") != manifest.get("pricing_snapshot")
+                        or ("max_output_tokens" in spec and model_config.get("max_output_tokens") != spec["max_output_tokens"])):
+                    fail("model_config_mismatch", f"row={index}; DeepSeek configuration", run_id)
         previous_baseline = baseline_by_case.setdefault(case_id, expected["baseline_hash"])
         if previous_baseline != expected["baseline_hash"]:
             fail("baseline_changed_between_runs", f"case_id={case_id}", run_id)
@@ -267,18 +334,24 @@ def verify_experiment(directory: Path) -> dict[str, Any]:
                 if not isinstance(source, str):
                     continue
                 path = Path(source)
-                if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != item.get("manifest_sha256"):
+                if check_external_sources and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != item.get("manifest_sha256"):
                     fail("input_source_changed", f"case_id={case_id}; manifest")
                 baseline = None
-                if path.is_file():
+                if check_external_sources and path.is_file():
                     try:
                         data = json.loads(path.read_text(encoding="utf-8"))
                         baseline = Path(data["baseline"])
                         if not baseline.is_absolute():
                             baseline = path.parent / baseline
+                        if "image_source" in item and item["image_source"] != data.get("image"):
+                            fail("input_source_changed", f"case_id={case_id}; image")
                     except (OSError, ValueError, KeyError, TypeError):
                         pass
-                if baseline is not None and baseline.is_dir() and _fingerprint(baseline) != item.get("baseline_hash"):
+                if manifest.get("image_resolution") == "local_image_id" and re.fullmatch(
+                    r"sha256:[0-9a-f]{64}", str(item.get("image", ""))
+                ) is None:
+                    fail("invalid_image_identity", f"case_id={case_id}")
+                if check_external_sources and baseline is not None and baseline.is_dir() and _fingerprint(baseline) != item.get("baseline_hash"):
                     fail("input_source_changed", f"case_id={case_id}; baseline")
     try:
         reconstructed = summarize(rows, schema_version=version)

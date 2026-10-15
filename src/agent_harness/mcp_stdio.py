@@ -11,7 +11,6 @@ import os
 import select
 import signal
 import subprocess
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -48,7 +47,6 @@ class McpStdioClient:
         self.pass_environment = tuple(pass_environment)
         self.max_frame_bytes = max_frame_bytes
         self._process: subprocess.Popen[bytes] | None = None
-        self._stderr = None
         self._buffer = bytearray()
         self._request_id = 0
         self._lock = threading.Lock()
@@ -62,11 +60,10 @@ class McpStdioClient:
             for name in ("PATH", "LANG", "LC_ALL", "HOME", *self.pass_environment)
             if name in os.environ
         }
-        self._stderr = tempfile.TemporaryFile()
         try:
             self._process = subprocess.Popen(
                 self.argv, cwd=self.cwd, env=environment,
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._stderr,
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
             discovery = self.request("server/discover", {}, timeout_s)
@@ -195,9 +192,6 @@ class McpStdioClient:
             for stream in (process.stdin, process.stdout):
                 if stream is not None:
                     stream.close()
-        if self._stderr is not None:
-            self._stderr.close()
-            self._stderr = None
 
     def __enter__(self) -> McpStdioClient:
         self.start()

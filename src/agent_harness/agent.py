@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import time
 import threading
+import hashlib
+import json
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass
 from typing import Callable
 
-from .contracts import ContextStrategy, Model, ModelFailure, SessionStore, TerminalStatus, Usage
-from .runtime import ToolRuntime
+from .contracts import ContextStrategy, Event, EventSink, Model, ModelFailure, SessionStore, TerminalStatus, ToolExecutor, Usage
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,10 @@ class BudgetUsage:
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
     cost_usd: float = 0.0
+    reported_cost_usd: float = 0.0
+    estimated_cost_usd: float = 0.0
+    unreported_cost_calls: int = 0
+    unestimated_cost_calls: int = 0
     unknown_usage_calls: int = 0
     unpriced_calls: int = 0
 
@@ -47,8 +52,19 @@ class BudgetUsage:
         self.cache_write_tokens += usage.cache_write_tokens
         if usage.cost_usd is not None:
             self.cost_usd += usage.cost_usd
+            if usage.cost_source == "reported":
+                self.reported_cost_usd += usage.cost_usd
+                self.unestimated_cost_calls += 1
+            elif usage.cost_source == "estimated":
+                self.estimated_cost_usd += usage.cost_usd
+                self.unreported_cost_calls += 1
+            else:
+                self.unreported_cost_calls += 1
+                self.unestimated_cost_calls += 1
         else:
             self.unpriced_calls += 1
+            self.unreported_cost_calls += 1
+            self.unestimated_cost_calls += 1
         if not usage.known:
             self.unknown_usage_calls += 1
 
@@ -67,11 +83,12 @@ class AgentLoop:
         self,
         model: Model,
         context: ContextStrategy,
-        runtime: ToolRuntime,
+        runtime: ToolExecutor,
         session: SessionStore,
         limits: BudgetLimits | None = None,
         cancel: threading.Event | None = None,
         checkpoint: Callable[[], str] | None = None,
+        event_sink: EventSink | None = None,
     ):
         self.model = model
         self.context = context
@@ -80,6 +97,17 @@ class AgentLoop:
         self.limits = limits or BudgetLimits()
         self.cancel = cancel or threading.Event()
         self.checkpoint = checkpoint
+        self.event_sink = event_sink
+
+    def _append(self, event_type: str, step: int, payload: dict) -> Event:
+        event = self.session.append(event_type, step, payload)
+        if self.event_sink is not None:
+            try:
+                self.event_sink.emit(event)
+            except Exception as exc:
+                self.event_sink = None
+                self.session.append("event_sink_error", step, {"error_type": type(exc).__name__})
+        return event
 
     def run(self, task: str | None = None, *, resume: bool = False) -> RunResult:
         if resume:
@@ -117,16 +145,16 @@ class AgentLoop:
             "permission": getattr(self.runtime.permission, "configuration", lambda: {})(),
         }
         if not resume:
-            self.session.append("run_started", 0, configuration)
+            self._append("run_started", 0, configuration)
             if self.checkpoint is not None:
-                self.session.append("workspace_checkpoint", 0, {
+                self._append("workspace_checkpoint", 0, {
                     "format_version": 2, "digest": self.checkpoint(),
                 })
 
         def finish(status: TerminalStatus, reason: str, answer: str = "") -> RunResult:
             if redact_text := getattr(self.session, "redact_text", None):
                 answer = redact_text(answer)
-            self.session.append(
+            self._append(
                 "terminal",
                 usage.steps,
                 {"status": status.value, "reason": reason, "answer": answer, "usage": asdict(usage)},
@@ -151,18 +179,18 @@ class AgentLoop:
                 reason = "pending_tool_calls"
             if model_requests != model_results:
                 reason = "unknown_model_result"
-                self.session.append("model_error", usage.steps, {
+                self._append("model_error", usage.steps, {
                     "error": "model result unknown after interruption", "usage": asdict(Usage(known=False)),
                 })
                 usage.add_model(Usage(known=False))
             if tool_requests != tool_results:
                 reason = "unknown_tool_result"
                 pending = next(event for event in reversed(events) if event.type == "tool_request")
-                self.session.append("tool_result", pending.step, {
+                self._append("tool_result", pending.step, {
                     "name": pending.payload["name"], "call_id": pending.payload["call_id"],
                     "status": "unknown", "error_code": "interrupted", "output": "tool result unknown after interruption",
                 })
-                self.session.append("tool_state", pending.step, {
+                self._append("tool_state", pending.step, {
                     "name": pending.payload["name"], "call_id": pending.payload["call_id"], "state": "unknown",
                 })
             if any(
@@ -189,9 +217,9 @@ class AgentLoop:
                     except ValueError:
                         reason = "model_state_invalid"
             if reason is not None:
-                self.session.append("recovery_blocked", usage.steps, {"reason": reason})
+                self._append("recovery_blocked", usage.steps, {"reason": reason})
                 return finish(TerminalStatus.FAILED, reason)
-            self.session.append("run_resumed", usage.steps, {
+            self._append("run_resumed", usage.steps, {
                 "remaining_steps": max(0, self.limits.steps - usage.steps),
                 "remaining_tokens": max(0, self.limits.tokens - usage.tokens),
                 "remaining_tool_calls": max(0, self.limits.tool_calls - usage.tool_calls),
@@ -212,41 +240,48 @@ class AgentLoop:
 
             try:
                 view = self.context.build(self.session.events, task, remaining_tokens)
+                prepare_view = getattr(self.model, "prepare_view", None)
+                if callable(prepare_view):
+                    view = prepare_view(view)
                 if redact_context := getattr(self.session, "redact_context", None):
                     view = redact_context(view)
             except Exception as exc:
-                self.session.append("context_error", usage.steps, {"error": f"{type(exc).__name__}: {exc}"})
+                self._append("context_error", usage.steps, {"error": f"{type(exc).__name__}: {exc}"})
                 return finish(TerminalStatus.FAILED, "context_error")
             estimated_tokens = sum(max(1, (len(message["content"]) + 2) // 3) for message in view.messages)
             if estimated_tokens > remaining_tokens:
                 return finish(TerminalStatus.BUDGET_EXHAUSTED, "estimated_input_tokens")
 
             usage.steps += 1
-            view_event = self.session.append(
+            view_event = self._append(
                 "context_view",
                 usage.steps,
                 {
                     "strategy": view.strategy,
                     "messages": list(view.messages),
+                    "view_version": 1,
+                    "messages_sha256": hashlib.sha256(
+                        json.dumps(list(view.messages), ensure_ascii=False, sort_keys=True).encode("utf-8")
+                    ).hexdigest(),
                     "event_ids": list(view.event_ids),
                     "metadata": dict(view.metadata),
                     "estimated_tokens": estimated_tokens,
                 },
             )
-            self.session.append("model_request", usage.steps, {"view_id": view_event.seq})
+            self._append("model_request", usage.steps, {"view_id": view_event.seq})
             try:
                 result = self.model.complete(view, tool_schemas, remaining_time)
             except ModelFailure as exc:
                 usage.add_model(exc.usage)
-                self.session.append("model_error", usage.steps, {"error": str(exc), "usage": asdict(exc.usage)})
+                self._append("model_error", usage.steps, {"error": str(exc), "usage": asdict(exc.usage)})
                 return finish(TerminalStatus.FAILED, "model_error")
             except Exception as exc:
                 usage.add_model(Usage(known=False))
-                self.session.append("model_error", usage.steps, {"error": f"{type(exc).__name__}: {exc}", "usage_known": False})
+                self._append("model_error", usage.steps, {"error": f"{type(exc).__name__}: {exc}", "usage_known": False})
                 return finish(TerminalStatus.FAILED, "model_error")
 
             usage.add_model(result.usage)
-            self.session.append(
+            self._append(
                 "model_response",
                 usage.steps,
                 {
@@ -257,7 +292,7 @@ class AgentLoop:
                 },
             )
             for index, call in enumerate(result.tool_calls):
-                self.session.append("tool_state", usage.steps, {
+                self._append("tool_state", usage.steps, {
                     "name": call.name, "call_id": call.call_id, "index": index, "state": "pending",
                 })
             if self.cancel.is_set():
@@ -282,21 +317,21 @@ class AgentLoop:
                 if usage.tool_calls >= self.limits.tool_calls:
                     return finish(TerminalStatus.BUDGET_EXHAUSTED, "tool_calls")
                 usage.tool_calls += 1
-                self.session.append("tool_request", usage.steps, {"name": call.name, "arguments": dict(call.arguments), "call_id": call.call_id})
-                self.session.append("tool_state", usage.steps, {
+                self._append("tool_request", usage.steps, {"name": call.name, "arguments": dict(call.arguments), "call_id": call.call_id})
+                self._append("tool_state", usage.steps, {
                     "name": call.name, "call_id": call.call_id, "state": "running",
                 })
                 tool_result = self.runtime.execute(call, remaining_time)
-                self.session.append(
+                self._append(
                     "tool_result",
                     usage.steps,
                     {"name": call.name, **asdict(tool_result)},
                 )
-                self.session.append("tool_state", usage.steps, {
+                self._append("tool_state", usage.steps, {
                     "name": call.name, "call_id": tool_result.call_id,
                     "state": "completed" if tool_result.status == "ok" else "failed",
                 })
                 if self.checkpoint is not None:
-                    self.session.append("workspace_checkpoint", usage.steps, {
+                    self._append("workspace_checkpoint", usage.steps, {
                         "format_version": 2, "digest": self.checkpoint(),
                     })

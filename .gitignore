@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv
 .runs/
+.exports/
 .env
 .env.*
 !.env.example

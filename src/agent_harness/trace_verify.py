@@ -71,6 +71,10 @@ def verify_trace(path: Path) -> dict[str, Any]:
     totals = {field: 0 for field in _USAGE_FIELDS}
     totals.update(steps=0, tool_calls=0, unknown_usage_calls=0, unpriced_calls=0)
     cost = 0.0
+    reported_cost = 0.0
+    estimated_cost = 0.0
+    unreported_calls = 0
+    unestimated_calls = 0
     model_calls = 0
     model_requests = 0
     seen_artifacts: set[str] = set()
@@ -137,6 +141,11 @@ def verify_trace(path: Path) -> dict[str, Any]:
             references = payload.get("event_ids")
             if not isinstance(references, list) or any(type(ref) is not int or ref < 1 or ref >= seq for ref in references):
                 fail("invalid_context_references", seq)
+            if "messages_sha256" in payload:
+                messages = payload.get("messages")
+                digest = hashlib.sha256(json.dumps(messages, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+                if payload.get("view_version") != 1 or payload["messages_sha256"] != digest:
+                    fail("context_view_hash_mismatch", seq)
         elif kind == "model_request":
             model_requests += 1
             view = views.get(payload.get("view_id")) if type(payload.get("view_id")) is int else None
@@ -174,12 +183,28 @@ def verify_trace(path: Path) -> dict[str, Any]:
             if raw.get("known", True) is not True:
                 totals["unknown_usage_calls"] += 1
             price = raw.get("cost_usd")
+            source = raw.get("cost_source", "reported")
+            if source not in ("reported", "estimated", "synthetic"):
+                fail("invalid_model_usage", seq, "cost_source")
+            if "raw_usage" in raw and raw["raw_usage"] is not None and not isinstance(raw["raw_usage"], dict):
+                fail("invalid_model_usage", seq, "raw_usage")
             if price is None:
                 totals["unpriced_calls"] += 1
+                unreported_calls += 1
+                unestimated_calls += 1
             elif isinstance(price, bool) or not isinstance(price, (int, float)) or not math.isfinite(price) or price < 0:
                 fail("invalid_model_usage", seq, "cost_usd")
             else:
                 cost += price
+                if source == "estimated":
+                    estimated_cost += price
+                    unreported_calls += 1
+                elif source == "reported":
+                    reported_cost += price
+                    unestimated_calls += 1
+                else:
+                    unreported_calls += 1
+                    unestimated_calls += 1
         elif kind == "tool_request":
             totals["tool_calls"] += 1
             if tool_pending is not None:
@@ -217,6 +242,12 @@ def verify_trace(path: Path) -> dict[str, Any]:
             recorded_cost = recorded.get("cost_usd")
             if isinstance(recorded_cost, bool) or not isinstance(recorded_cost, (int, float)) or not math.isclose(recorded_cost, cost, rel_tol=1e-9, abs_tol=1e-12):
                 fail("usage_mismatch", terminal["seq"], f"cost_usd: expected={cost}, recorded={recorded_cost!r}")
+            for field, expected in (
+                ("reported_cost_usd", reported_cost), ("estimated_cost_usd", estimated_cost),
+                ("unreported_cost_calls", unreported_calls), ("unestimated_cost_calls", unestimated_calls),
+            ):
+                if field in recorded and recorded[field] != expected:
+                    fail("usage_mismatch", terminal["seq"], f"{field}: expected={expected}, recorded={recorded[field]!r}")
 
     evaluation = [event for event in events if event["type"] == "evaluation_result"]
     if setups and "holdout_test" in setups[0]["payload"]:

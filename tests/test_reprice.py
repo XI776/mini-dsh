@@ -11,6 +11,39 @@ from agent_harness.session import JsonlSession
 
 
 class RepriceTests(unittest.TestCase):
+    def test_explicitly_unknown_cache_breakdown_has_no_estimate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with JsonlSession(root / "runs") as session:
+                session.append("run_started", 0, {"model": "deepseek:deepseek-flash:https://api.deepseek.com"})
+                session.append("model_response", 1, {"usage": {
+                    "input_tokens": 10, "output_tokens": 2, "cache_read_tokens": 0,
+                    "known": True, "cache_usage_known": False, "cost_usd": None,
+                }})
+                session.append("terminal", 1, {"status": "finished"})
+                row = {
+                    "case_id": "case", "strategy": "full_history", "repetition": 0,
+                    "run_id": session.run_id, "trace": str(session.root / "trace.jsonl"),
+                    "success": True, "public_pass": True, "holdout_pass": None,
+                    "agent_status": "finished", "tool_errors": 0,
+                    "input_tokens": 10, "output_tokens": 2, "cache_read_tokens": 0,
+                    "cache_write_tokens": 0, "total_tokens": 12,
+                    "agent_wall_ms": 1, "evaluation_wall_ms": 2,
+                    "recorded_cost_usd": 0.0, "unpriced_calls": 1, "unknown_usage_calls": 0,
+                }
+            experiment = root / "experiment"
+            experiment.mkdir()
+            (experiment / "manifest.json").write_text(json.dumps({
+                "schema_version": 1, "cases": ["case"], "strategies": ["full_history"],
+                "repetitions": 1, "model_label": "deepseek:deepseek-flash",
+            }))
+            (experiment / "runs.jsonl").write_text(json.dumps(row) + "\n")
+            output = root / "priced"
+            summary = reprice_experiment(experiment, DeepSeekPricing(0.1, 1.0, 2.0), output)
+            self.assertIsNone(summary["full_history"]["mean_estimated_cost_usd"])
+            priced = json.loads((output / "runs.jsonl").read_text())
+            self.assertFalse(priced["cache_breakdown_verified"])
+
     def test_missing_usage_does_not_become_zero_cost(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

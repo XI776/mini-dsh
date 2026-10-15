@@ -57,21 +57,32 @@ def _reprice_row(
     totals = [0, 0, 0]
     unknown = 0
     estimate = 0.0
+    missing_cache_breakdown = 0
+    legacy_cache_breakdown = 0
     for event in usage_events:
-        input_tokens, output_tokens, cache_hits, known = _usage_tokens(event["payload"].get("usage"), run_id)
+        raw_usage = event["payload"].get("usage")
+        input_tokens, output_tokens, cache_hits, known = _usage_tokens(raw_usage, run_id)
         totals[0] += input_tokens
         totals[1] += output_tokens
         totals[2] += cache_hits
-        estimate += pricing.estimate(input_tokens, output_tokens, cache_hits)
+        cache_status = raw_usage.get("cache_usage_known") if isinstance(raw_usage, Mapping) else None
+        if cache_status is False:
+            missing_cache_breakdown += 1
+        else:
+            if cache_status is None:
+                legacy_cache_breakdown += 1
+            estimate += pricing.estimate(input_tokens, output_tokens, cache_hits)
         unknown += not known
     expected = (record["input_tokens"], record["output_tokens"], record["cache_read_tokens"])
     if tuple(totals) != expected or unknown != record["unknown_usage_calls"]:
         raise ValueError(f"trace and experiment usage disagree for run {run_id}")
     priced = dict(record)
-    priced["estimated_cost_usd"] = estimate if unknown == 0 else None
+    priced["estimated_cost_usd"] = estimate if unknown == 0 and missing_cache_breakdown == 0 else None
     priced["known_cost_lower_bound_usd"] = estimate
     priced["model_calls"] = len(usage_events)
-    priced["pricing_complete"] = unknown == 0
+    priced["pricing_complete"] = unknown == 0 and missing_cache_breakdown == 0
+    priced["cache_breakdown_verified"] = missing_cache_breakdown == 0 and legacy_cache_breakdown == 0
+    priced["legacy_cache_breakdown_calls"] = legacy_cache_breakdown
     priced["model_identity"] = model_identity
     return priced
 

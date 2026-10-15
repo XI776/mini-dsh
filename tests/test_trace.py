@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from agent_harness.session import JsonlSession
-from agent_harness.trace import first_difference
+from agent_harness.trace import divergence_report, first_difference
 
 
 class TraceDiffTests(unittest.TestCase):
@@ -20,10 +20,12 @@ class TraceDiffTests(unittest.TestCase):
         call_name: str = "read_file", usage: int = 5,
         result_code: str | None = None,
         evaluation_success: bool | None = None,
+        model_config: dict | None = None,
     ) -> Path:
         with JsonlSession(self.root / "runs") as session:
             session.append("run_started", 0, {
                 "task": "task", "limits": {"steps": 3}, "model": "deepseek:model:url",
+                "model_config": model_config or {},
                 "context": strategy, "tools": [{"name": tool_name, "parameters": {"type": "object"}}],
             })
             session.append("context_view", 1, {
@@ -69,6 +71,8 @@ class TraceDiffTests(unittest.TestCase):
         different_tools = self.trace(tool_name="write_file")
         mismatch = first_difference(left, different_tools)
         self.assertEqual((mismatch["reason"], mismatch["field"]), ("config_mismatch", "tools"))
+        different_model_config = self.trace(model_config={"temperature": 0.7})
+        self.assertEqual(first_difference(left, different_model_config)["field"], "model_config")
         denied = self.trace(strategy="summary", result_code="permission_denied")
         self.assertEqual(first_difference(left, denied)["reason"], "permission")
 
@@ -76,6 +80,24 @@ class TraceDiffTests(unittest.TestCase):
         left = self.trace(evaluation_success=True)
         right = self.trace(strategy="summary", evaluation_success=False)
         self.assertEqual(first_difference(left, right)["reason"], "evaluation")
+
+    def test_report_separates_input_and_behavior_with_trace_locations(self) -> None:
+        left = self.trace()
+        changed_input = self.trace(strategy="summary", messages=[{"role": "user", "content": "changed"}])
+        report = divergence_report(left, changed_input)
+        self.assertEqual(report["first_context_difference"]["left_trace"], str(left))
+        self.assertIsNotNone(report["first_context_difference"]["left_seq"])
+        self.assertIsNone(report["first_observable_behavior_difference"])
+
+        changed_action = self.trace(strategy="summary", call_name="patch_file")
+        report = divergence_report(left, changed_action)
+        self.assertIsNone(report["first_context_difference"])
+        self.assertEqual(report["first_observable_behavior_difference"]["category"], "model_action")
+        self.assertEqual(report["first_tool_call_difference"]["category"], "tool_call")
+        changed_usage = self.trace(strategy="summary", usage=9)
+        report = divergence_report(left, changed_usage)
+        self.assertEqual(report["first_usage_difference"]["category"], "usage")
+        self.assertEqual(report["first_budget_or_terminal_difference"]["category"], "budget_or_terminal")
 
 
 if __name__ == "__main__":

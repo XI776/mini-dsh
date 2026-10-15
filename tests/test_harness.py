@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 
 from agent_harness.agent import AgentLoop, BudgetLimits
-from agent_harness.context import FullHistory, PythonSymbolContext, RepositoryContext, RepositoryIndex, RetrievalSummaryContext, SummaryContext
-from agent_harness.contracts import ContextView, ModelResult, TerminalStatus, ToolCall
+from agent_harness.context import FullHistory, PythonSymbolContext, RepositoryContext, RepositoryIndex, RetrievalSummaryContext, SlidingWindow, SummaryContext
+from agent_harness.contracts import ContextView, Event, ModelResult, TerminalStatus, ToolCall
 from agent_harness.model import ScriptedModel
 from agent_harness.plugins import PluginGroup
 from agent_harness.runtime import ReadFileTool, ShellTool, ToolRuntime, WorkspaceFiles, WorkspacePolicy, WriteFileTool
@@ -19,6 +19,67 @@ from agent_harness.trace import first_difference
 
 
 class HarnessTests(unittest.TestCase):
+    def test_protocol_injection_accepts_memory_session_runtime_and_event_sink(self) -> None:
+        class MemorySession:
+            run_id = "memory"
+
+            def __init__(self):
+                self.saved = []
+
+            @property
+            def events(self):
+                return tuple(self.saved)
+
+            def append(self, event_type, step, payload):
+                event = Event(self.run_id, len(self.saved) + 1, event_type, step, payload, "2026-01-01T00:00:00+00:00", 0)
+                self.saved.append(event)
+                return event
+
+        class MemoryRuntime:
+            permission = WorkspacePolicy()
+            tools = {}
+
+            def schemas(self):
+                return []
+
+            def execute(self, call, timeout_s):
+                raise AssertionError("no tool calls expected")
+
+        class Context:
+            name = "memory"
+
+            def build(self, events, task, token_budget):
+                return ContextView(({"role": "user", "content": task},), (), self.name)
+
+        class Model:
+            identity = "memory-model"
+
+            def complete(self, view, tool_schemas, timeout_s):
+                return ModelResult("done", finish=True)
+
+        class Sink:
+            def __init__(self):
+                self.events = []
+
+            def emit(self, event):
+                self.events.append(event)
+
+        session, sink = MemorySession(), Sink()
+        result = AgentLoop(Model(), Context(), MemoryRuntime(), session, event_sink=sink).run("task")
+        self.assertEqual(result.status, TerminalStatus.FINISHED)
+        self.assertEqual(sink.events, session.saved)
+
+        class BrokenSink:
+            def emit(self, event):
+                raise RuntimeError("sink unavailable")
+
+        recovery_session = MemorySession()
+        recovered = AgentLoop(
+            Model(), Context(), MemoryRuntime(), recovery_session, event_sink=BrokenSink()
+        ).run("task")
+        self.assertEqual(recovered.status, TerminalStatus.FINISHED)
+        self.assertEqual(sum(event.type == "event_sink_error" for event in recovery_session.events), 1)
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -177,9 +238,43 @@ class HarnessTests(unittest.TestCase):
         group = PluginGroup([TestPlugin("a"), TestPlugin("b", ("a",), True)])
         with self.assertRaises(RuntimeError):
             group.start()
-        self.assertEqual(log, ["start:a", "start:b", "close:a"])
+        self.assertEqual(log, ["start:a", "start:b", "close:b", "close:a"])
         with self.assertRaises(ValueError):
             PluginGroup([TestPlugin("a", ("b",)), TestPlugin("b", ("a",))]).ordered()
+
+    def test_plugin_lifecycle_dependency_and_cleanup_errors(self) -> None:
+        calls: list[str] = []
+
+        class Plugin:
+            def __init__(self, name: str, requires: tuple[str, ...] = (), close_fails: bool = False):
+                self.name, self.requires, self.close_fails = name, requires, close_fails
+
+            def start(self) -> None:
+                calls.append("start:" + self.name)
+
+            def close(self) -> None:
+                calls.append("close:" + self.name)
+                if self.close_fails:
+                    raise RuntimeError(self.name)
+
+        group = PluginGroup([Plugin("dependent", ("base",)), Plugin("base")])
+        group.start()
+        with self.assertRaises(RuntimeError):
+            group.start()
+        group.close()
+        group.close()
+        self.assertEqual(calls, ["start:base", "start:dependent", "close:dependent", "close:base"])
+        with self.assertRaisesRegex(ValueError, "missing plugin dependency"):
+            PluginGroup([Plugin("dependent", ("missing",))]).start()
+        with self.assertRaisesRegex(ValueError, "duplicate plugin name"):
+            PluginGroup([Plugin("same"), Plugin("same")]).start()
+
+        calls.clear()
+        failing_close = PluginGroup([Plugin("base", close_fails=True), Plugin("dependent", ("base",))])
+        failing_close.start()
+        with self.assertRaises(ExceptionGroup):
+            failing_close.close()
+        self.assertEqual(calls[-2:], ["close:dependent", "close:base"])
 
     def test_context_strategies_and_trace_diff(self) -> None:
         (self.workspace / "example.py").write_text("def find_answer():\n    return 42\n")
@@ -196,6 +291,17 @@ class HarnessTests(unittest.TestCase):
         difference = first_difference(session.root / "trace.jsonl", other.root / "trace.jsonl")
         self.assertEqual(difference["left"]["type"], "model_response")
         self.assertIsNone(first_difference(session.root / "trace.jsonl", session.root / "trace.jsonl"))
+
+    def test_context_selection_records_window_and_budget_drops(self) -> None:
+        session = self.session()
+        first = session.append("model_response", 1, {"message": "a" * 30})
+        second = session.append("model_response", 2, {"message": "b" * 30})
+        window = SlidingWindow(1).build(session.events, "task", None)
+        self.assertEqual(window.metadata["window_dropped_range"], [first.seq, first.seq])
+        self.assertEqual(window.event_ids, (second.seq,))
+        budgeted = FullHistory().build(session.events, "task", 10)
+        self.assertIn(first.seq, budgeted.metadata["selection"]["dropped_event_ids"])
+        self.assertEqual(budgeted.metadata["selection"]["reason"], "token_budget")
 
     def test_retrieval_indexes_refresh_after_agent_write(self) -> None:
         for name, make_context in (

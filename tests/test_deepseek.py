@@ -9,7 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent_harness.contracts import ContextView, ModelFailure
+from agent_harness.agent import AgentLoop
 from agent_harness.deepseek import DeepSeekModel, DeepSeekPricing, load_api_key
+from agent_harness.runtime import ToolRuntime, WorkspacePolicy
+from agent_harness.session import JsonlSession
+from agent_harness.trace_verify import verify_trace
 
 
 class FakeResponse:
@@ -27,6 +31,61 @@ class FakeResponse:
 
 
 class DeepSeekTests(unittest.TestCase):
+    def test_cache_mix_can_reverse_token_and_estimated_cost_order(self) -> None:
+        pricing = DeepSeekPricing(cache_hit=0.003, cache_miss=0.15, output=0.6)
+        more_tokens = pricing.estimate(input_tokens=1000, output_tokens=100, cache_hit_tokens=900)
+        fewer_tokens = pricing.estimate(input_tokens=800, output_tokens=100, cache_hit_tokens=0)
+        self.assertLess(800 + 100, 1000 + 100)
+        self.assertGreater(fewer_tokens, more_tokens)
+
+    def test_trace_context_view_matches_sent_messages(self) -> None:
+        requests = []
+
+        def opener(request, timeout):
+            requests.append(json.loads(request.data))
+            return FakeResponse({
+                "choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 2},
+            })
+
+        class Context:
+            name = "spy"
+
+            def build(self, events, task, token_budget):
+                return ContextView(({"role": "user", "content": task},
+                                    {"role": "tool", "content": "prior result"}), (), self.name)
+
+        with tempfile.TemporaryDirectory() as directory:
+            with JsonlSession(Path(directory)) as session:
+                result = AgentLoop(
+                    DeepSeekModel("test-secret", opener=opener), Context(),
+                    ToolRuntime([], WorkspacePolicy(), session), session,
+                ).run("task")
+                self.assertEqual(result.status.value, "finished")
+                view = next(event for event in session.events if event.type == "context_view")
+                self.assertEqual(view.payload["messages"], requests[0]["messages"])
+                self.assertEqual(view.payload["messages"][1]["role"], "user")
+                self.assertTrue(verify_trace(session.root / "trace.jsonl")["ok"])
+                records = [json.loads(line) for line in (session.root / "trace.jsonl").read_text().splitlines()]
+                next(item for item in records if item["type"] == "context_view")["payload"]["messages"][0]["content"] = "changed"
+                tampered = session.root / "tampered.jsonl"
+                tampered.write_text("".join(json.dumps(item) + "\n" for item in records))
+                codes = {item["code"] for item in verify_trace(tampered)["errors"]}
+                self.assertIn("context_view_hash_mismatch", codes)
+
+    def test_max_output_tokens_is_sent_and_snapshotted(self) -> None:
+        sent = []
+        def opener(request, timeout):
+            sent.append(json.loads(request.data))
+            return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+                                 "usage": {"prompt_tokens": 3, "completion_tokens": 1}})
+        model = DeepSeekModel("test-secret", opener=opener, max_output_tokens=4096)
+        model.complete(ContextView(({"role": "user", "content": "task"},), (), "full_history"), [], 5)
+        self.assertEqual(sent[0]["max_tokens"], 4096)
+        self.assertEqual(model.configuration()["max_output_tokens"], 4096)
+        with self.assertRaises(ValueError):
+            DeepSeekModel("test-secret", max_output_tokens=0)
+
     def test_dotenv_key_and_environment_override(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / ".env"
@@ -62,6 +121,8 @@ class DeepSeekTests(unittest.TestCase):
         self.assertEqual(result.usage.cache_read_tokens, 75)
         self.assertTrue(result.usage.cache_usage_known)
         self.assertAlmostEqual(result.usage.cost_usd, (75 * 0.1 + 25 * 1 + 20 * 2) / 1_000_000)
+        self.assertEqual(result.usage.cost_source, "estimated")
+        self.assertEqual(result.usage.raw_usage["prompt_cache_miss_tokens"], 25)
         sent = json.loads(requests[0][0].data)
         self.assertEqual(sent["tools"][0]["function"]["name"], "tool_0")
         self.assertEqual(sent["messages"][1]["role"], "user")
@@ -80,6 +141,15 @@ class DeepSeekTests(unittest.TestCase):
                            [{"name": "read_file", "parameters": {"type": "object"}}], 1)
         self.assertEqual(failure.exception.usage.total_tokens, 11)
         self.assertFalse(failure.exception.usage.cache_usage_known)
+
+    def test_missing_cache_breakdown_has_no_price_estimate(self) -> None:
+        model = DeepSeekModel("secret", pricing=DeepSeekPricing(0.1, 1.0, 2.0), opener=lambda *a, **k: FakeResponse({
+            "choices": [{"finish_reason": "stop", "message": {"content": "done"}}],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 3},
+        }))
+        result = model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 1)
+        self.assertIsNone(result.usage.cost_usd)
+        self.assertFalse(result.usage.cache_usage_known)
 
     def test_http_error_excludes_response_body_and_key(self) -> None:
         def opener(*args, **kwargs):

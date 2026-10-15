@@ -35,7 +35,7 @@ def _config_difference(left: list[dict[str, Any]], right: list[dict[str, Any]]) 
     else:
         # Context names intentionally differ in an ablation. Tool schemas and
         # descriptions are part of the model input and must match when present.
-        for field in ("task", "limits", "model", "tools"):
+        for field in ("task", "limits", "model", "model_config", "tools", "permission"):
             if left_start["payload"].get(field) != right_start["payload"].get(field):
                 return {"index": -1, "reason": "config_mismatch", "field": field,
                         "left": left_start, "right": right_start}
@@ -152,3 +152,65 @@ def first_difference(left: Path, right: Path) -> dict[str, Any] | None:
                     "left": left_event, "right": right_event,
                 }
     return None
+
+
+def divergence_report(left: Path, right: Path) -> dict[str, Any]:
+    """Separate changed model input from changed actions and accounting."""
+    left_trace, right_trace = read_trace(left), read_trace(right)
+    left_events, right_events = _indexed(left_trace), _indexed(right_trace)
+    slots = sorted(left_events.keys() | right_events.keys())
+    names = {
+        "context": {"context_view", "context_error"},
+        "model_action": {"model_response", "model_error"},
+        "tool_call": {"tool_request"},
+        "tool_result": {"tool_result"},
+        "terminal": {"terminal"},
+        "evaluation": {"public_test_result", "holdout_test_result", "evaluation_result"},
+    }
+
+    def evidence(slot: tuple[int, int, int, int], category: str) -> dict[str, Any]:
+        a, b = left_events.get(slot), right_events.get(slot)
+        return {
+            "category": category,
+            "step": slot[0],
+            "reason": _reason(a, b),
+            "left_trace": str(left), "left_seq": a["seq"] if a else None,
+            "right_trace": str(right), "right_seq": b["seq"] if b else None,
+        }
+
+    result: dict[str, Any] = {"config_difference": _config_difference(left_trace, right_trace)}
+    for category, kinds in names.items():
+        found = None
+        for slot in slots:
+            a, b = left_events.get(slot), right_events.get(slot)
+            if not any(event is not None and event["type"] in kinds for event in (a, b)):
+                continue
+            if _behavior(a) != _behavior(b):
+                found = evidence(slot, category)
+                break
+        result[f"first_{category}_difference"] = found
+
+    behavior_categories = ("model_action", "tool_call", "tool_result", "terminal", "evaluation")
+    differences = [result[f"first_{name}_difference"] for name in behavior_categories]
+    result["first_observable_behavior_difference"] = min(
+        (item for item in differences if item is not None),
+        key=lambda item: (item["step"], item["left_seq"] or item["right_seq"] or 0),
+        default=None,
+    )
+    result["first_usage_difference"] = next((
+        evidence(slot, "usage")
+        for slot in slots
+        if (a := left_events.get(slot)) is not None
+        and (b := right_events.get(slot)) is not None
+        and a["type"] in ("model_response", "model_error", "terminal")
+        and _usage(a) != _usage(b)
+    ), None)
+    result["first_budget_or_terminal_difference"] = next((
+        evidence(slot, "budget_or_terminal")
+        for slot in slots
+        if slot[1] == 3 and (
+            _behavior(left_events.get(slot)) != _behavior(right_events.get(slot))
+            or _usage(left_events.get(slot)) != _usage(right_events.get(slot))
+        )
+    ), None)
+    return result

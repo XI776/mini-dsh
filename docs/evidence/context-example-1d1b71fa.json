@@ -1,0 +1,15 @@
+{
+  "experiment": "../../.runs/experiments/context-example-1d1b71fa",
+  "files": {
+    "../../.runs/0dd637e8d3904d41b6c237b1c35b92ed/trace.jsonl": "d73cfb01eef1c253c880aac3898cc95242348a2451a3542e1ed1473fffea09c9",
+    "../../.runs/16d56977e7434410a6ca2754c7ce3205/trace.jsonl": "e258325dc11bde99b5679c94a9068e0599fbebe3118f3d824f7c252bc747b0e1",
+    "../../.runs/31db76eea972442d8d5565c49147b5e8/trace.jsonl": "c1109fb12a71ba3ce68418ba17b4800ae43ee3d4d90e2ca01a15c73004b7dbbb",
+    "../../.runs/a81b013d50fa4769996d1872efd124f0/trace.jsonl": "a2fe214d6b9c9b949e9aceeb90c6c904efa02745f87bbfe5055879c79685f542",
+    "../../.runs/ad58c339d96c42aa98b3f40a55c0aa43/trace.jsonl": "baf8bfdfb9dd9c4a1a569ac63f6911882b5c44a74bca578b30c621a78fed7751",
+    "../../.runs/c76354f2feaa40f296d1984fe55adcd3/trace.jsonl": "57dac6ce2a40947b4a9d4874cddb6e13a6426a2b7b801c58ffc0a6cfdcd59af0",
+    "../../.runs/experiments/context-example-1d1b71fa/manifest.json": "63f42cd630d831e3ab88e72c803f02c266168f1730ddf562ddc9c16423ed0fa6",
+    "../../.runs/experiments/context-example-1d1b71fa/runs.jsonl": "c11794d12fcd1dbda178280d361645587416b3bb468d291a6d4aa03d2554eda3",
+    "../../.runs/experiments/context-example-1d1b71fa/summary.json": "6104bdb3d4725c58ab68bbf284645016c9080650cf13a5c34e0d4ddeaa92e3b8"
+  },
+  "schema_version": 1
+}

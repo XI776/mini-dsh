@@ -18,23 +18,36 @@ from .contracts import ContextView, Event
 
 
 class JsonlSession:
-    def __init__(self, root: Path, run_id: str | None = None, secrets: Sequence[str] = ()):
+    def __init__(
+        self, root: Path, run_id: str | None = None, secrets: Sequence[str] = (),
+        max_artifact_bytes: int = 512 * 1024 * 1024,
+    ):
+        if max_artifact_bytes < 1:
+            raise ValueError("max_artifact_bytes must be positive")
         self.run_id = run_id or uuid.uuid4().hex
         if not self.run_id.isalnum():
             raise ValueError("run_id must be alphanumeric")
         self.root = Path(root) / self.run_id
-        self.root.mkdir(parents=True, exist_ok=False)
-        (self.root / "artifacts").mkdir()
+        self.root.mkdir(parents=True, exist_ok=False, mode=0o700)
+        (self.root / "artifacts").mkdir(mode=0o700)
+        self.max_artifact_bytes = max_artifact_bytes
+        self._artifact_bytes = 0
         self._events: list[Event] = []
         self._secrets = tuple(sorted({secret for secret in secrets if secret}, key=len, reverse=True))
         self._secret_bytes = tuple(secret.encode("utf-8") for secret in self._secrets)
         self._start = time.monotonic()
-        self._trace = (self.root / "trace.jsonl").open("x", encoding="utf-8")
+        trace_fd = os.open(self.root / "trace.jsonl", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        self._trace = os.fdopen(trace_fd, "w", encoding="utf-8")
 
     @classmethod
-    def open_existing(cls, root: Path, run_id: str, secrets: Sequence[str] = ()) -> JsonlSession:
+    def open_existing(
+        cls, root: Path, run_id: str, secrets: Sequence[str] = (),
+        max_artifact_bytes: int = 512 * 1024 * 1024,
+    ) -> JsonlSession:
         if not run_id.isalnum():
             raise ValueError("run_id must be alphanumeric")
+        if max_artifact_bytes < 1:
+            raise ValueError("max_artifact_bytes must be positive")
         directory = Path(root) / run_id
         trace = directory / "trace.jsonl"
         raw = trace.read_bytes()
@@ -51,6 +64,8 @@ class JsonlSession:
         session = cls.__new__(cls)
         session.run_id = run_id
         session.root = directory
+        session.max_artifact_bytes = max_artifact_bytes
+        session._artifact_bytes = sum(path.stat().st_size for path in (directory / "artifacts").iterdir() if path.is_file())
         session._events = [Event(**item) for item in records]
         session._secrets = tuple(sorted({secret for secret in secrets if secret}, key=len, reverse=True))
         session._secret_bytes = tuple(secret.encode("utf-8") for secret in session._secrets)
@@ -142,6 +157,8 @@ class JsonlSession:
             temporary = Path(target.name)
             try:
                 for chunk in self._redacted_chunks(stream):
+                    if self._artifact_bytes + target.tell() + len(chunk) > self.max_artifact_bytes:
+                        raise ValueError("session artifact storage quota exceeded")
                     digest.update(chunk)
                     target.write(chunk)
                 target.flush()
@@ -154,6 +171,7 @@ class JsonlSession:
             temporary.unlink()
         else:
             os.replace(temporary, destination)
+            self._artifact_bytes += destination.stat().st_size
         return digest.hexdigest()
 
     def close(self) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import uuid
 from dataclasses import dataclass
@@ -11,6 +12,26 @@ from typing import Any, Mapping, Sequence
 
 from .contracts import SessionStore, ToolResult
 from .process import ProcessCapture, run_process
+
+
+_IMAGE_ID = re.compile(r"sha256:[0-9a-f]{64}\Z")
+
+
+def resolve_image_id(image: str) -> str:
+    """Resolve a local image once so all evaluation runs use identical bytes."""
+    if not image or image.startswith("-"):
+        raise ValueError("a Docker image name is required")
+    try:
+        result = subprocess.run(
+            ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+            capture_output=True, text=True, check=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"cannot inspect local Docker image {image!r}: {exc}") from exc
+    image_id = result.stdout.strip()
+    if not _IMAGE_ID.fullmatch(image_id):
+        raise RuntimeError(f"Docker returned an invalid image ID for {image!r}")
+    return image_id
 
 
 @dataclass(frozen=True)
@@ -69,8 +90,8 @@ def _mount_arg(source: Path, target: str, readonly: bool) -> str:
 
 def _as_result(capture: ProcessCapture) -> ToolResult:
     return ToolResult(
-        "", "ok" if capture.exit_code == 0 else "error", capture.output,
-        None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
+        "", "ok" if capture.exit_code == 0 and not capture.output_limit_exceeded else "error", capture.output,
+        "output_limit_exceeded" if capture.output_limit_exceeded else None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
         capture.artifact_id, capture.truncated,
     )
 

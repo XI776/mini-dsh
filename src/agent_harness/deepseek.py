@@ -96,12 +96,14 @@ def _usage(raw: Any, pricing: DeepSeekPricing | None) -> Usage:
             raise ValueError("invalid cache miss token count")
         if cache_misses is not None and cache_misses != input_tokens - cache_hits:
             raise ValueError("cache token breakdown does not equal prompt tokens")
+        cache_known = "prompt_cache_hit_tokens" in raw and "prompt_cache_miss_tokens" in raw
         cost = None
-        if pricing is not None:
+        if pricing is not None and cache_known:
             cost = pricing.estimate(input_tokens, output_tokens, cache_hits)
         return Usage(
             input_tokens, output_tokens, cache_read_tokens=cache_hits, cost_usd=cost,
-            cache_usage_known="prompt_cache_hit_tokens" in raw and "prompt_cache_miss_tokens" in raw,
+            cache_usage_known=cache_known,
+            cost_source="estimated", raw_usage=dict(raw),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise ModelFailure(f"invalid DeepSeek usage: {exc}", Usage(known=False)) from exc
@@ -117,6 +119,7 @@ class DeepSeekModel:
         base_url: str = DEFAULT_BASE_URL,
         pricing: DeepSeekPricing | None = None,
         opener: Callable[..., Any] | None = None,
+        max_output_tokens: int | None = None,
     ) -> None:
         if not api_key.strip():
             raise ValueError("DEEPSEEK_API_KEY is empty")
@@ -124,10 +127,13 @@ class DeepSeekModel:
             raise ValueError("DeepSeek model is empty")
         if not base_url.startswith("https://"):
             raise ValueError("DeepSeek base URL must use HTTPS")
+        if max_output_tokens is not None and (type(max_output_tokens) is not int or not 1 <= max_output_tokens <= 393216):
+            raise ValueError("max_output_tokens must be an integer between 1 and 393216")
         self._api_key = api_key.strip()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.pricing = pricing
+        self.max_output_tokens = max_output_tokens
         self._opener = opener or urllib.request.urlopen
         self.identity = f"deepseek:{model}:{self.base_url}"
 
@@ -136,11 +142,25 @@ class DeepSeekModel:
         return (self._api_key,)
 
     def configuration(self) -> dict[str, object]:
-        return {"pricing": asdict(self.pricing) if self.pricing is not None else None}
+        return {"pricing": asdict(self.pricing) if self.pricing is not None else None,
+                "max_output_tokens": self.max_output_tokens}
 
     def resume_from(self, completed_calls: int) -> None:
         if completed_calls < 0:
             raise ValueError("invalid completed call count")
+
+    def prepare_view(self, view: ContextView) -> ContextView:
+        """Return the exact messages that the DeepSeek request will contain."""
+        messages = []
+        for message in view.messages:
+            role = message.get("role", "user")
+            # A compressed history may omit the native tool-call pairing.
+            if role == "tool":
+                role = "user"
+            if role not in ("system", "user", "assistant"):
+                raise ModelFailure("invalid role in context view", Usage(known=False))
+            messages.append({"role": role, "content": str(message.get("content", ""))})
+        return ContextView(tuple(messages), view.event_ids, view.strategy, view.metadata)
 
     def complete(self, view: ContextView, tool_schemas: Sequence[Mapping[str, Any]], timeout_s: float) -> ModelResult:
         if timeout_s <= 0:
@@ -159,17 +179,10 @@ class DeepSeekModel:
             tools.append({"type": "function", "function": {
                 "name": alias, "description": str(description), "parameters": schema["parameters"],
             }})
-        messages = []
-        for message in view.messages:
-            role = message.get("role", "user")
-            # Context strategies can summarize or clip any event. Treat tool output as
-            # user text so every resulting view is valid without native call pairing.
-            if role == "tool":
-                role = "user"
-            if role not in ("system", "user", "assistant"):
-                raise ModelFailure("invalid role in context view", Usage(known=False))
-            messages.append({"role": role, "content": str(message.get("content", ""))})
+        messages = list(self.prepare_view(view).messages)
         request: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
+        if self.max_output_tokens is not None:
+            request["max_tokens"] = self.max_output_tokens
         if tools:
             request["tools"] = tools
         body = json.dumps(request, ensure_ascii=False).encode("utf-8")

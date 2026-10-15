@@ -6,17 +6,19 @@ import argparse
 import hashlib
 import json
 from contextlib import ExitStack
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from uuid import uuid4
 
 from .agent import AgentLoop, BudgetLimits
+from .bundle import export_experiment, verify_bundle
 from .context import (
     FullHistory, PythonSymbolContext, RepositoryContext, RepositoryIndex,
     RetrievalSummaryContext, SlidingWindow, SummaryContext,
 )
-from .docker_runtime import DockerCommandTool, DockerRunner, DockerShellTool
+from .docker_runtime import DockerCommandTool, DockerRunner, DockerShellTool, resolve_image_id
 from .deepseek import DEFAULT_MODEL, DeepSeekModel, load_api_key, load_pricing
+from .evidence import seal_experiment, verify_anchor
 from .eval import evaluate, load_case
 from .experiment import load_plan, run_experiment
 from .experiment_verify import verify_experiment
@@ -29,7 +31,7 @@ from .runtime import (
     ToolRuntime, WorkspaceFiles, WorkspacePolicy, WriteFileTool,
 )
 from .session import JsonlSession
-from .trace import first_difference
+from .trace import divergence_report, first_difference
 from .trace_verify import verify_trace
 
 
@@ -72,6 +74,7 @@ def _model(args: argparse.Namespace, cwd: Path, seed: int | None = None):
         return DeepSeekModel(
             load_api_key(args.deepseek_env_file), args.deepseek_model,
             pricing=pricing,
+            max_output_tokens=args.deepseek_max_output_tokens,
         )
     return CommandModel(_argv_json(args.model_argv), cwd, args.model_env, seed=seed)
 
@@ -87,6 +90,7 @@ def _add_model_options(command: argparse.ArgumentParser, script_map: bool = Fals
     command.add_argument("--deepseek-model", default=DEFAULT_MODEL, help="DeepSeek model name")
     command.add_argument("--deepseek-env-file", type=Path, default=Path(".env"), help="file containing DEEPSEEK_API_KEY")
     command.add_argument("--deepseek-pricing", type=Path, help="JSON price snapshot in USD per 1M tokens")
+    command.add_argument("--deepseek-max-output-tokens", type=int, help="maximum generated tokens per DeepSeek request")
 
 
 def _load_mcp(config_path: Path, stack: ExitStack, session: JsonlSession):
@@ -175,6 +179,8 @@ def main() -> None:
     batch.add_argument("--traces", type=Path, default=Path(".runs"))
     batch.add_argument("--output", type=Path, help="new experiment output directory")
     batch.add_argument("--model-label", help="provider and model version label for experiment reports")
+    batch.add_argument("--max-estimated-cost-usd", type=float,
+                       help="conservative preflight estimate and observed estimate guard; not a billing limit")
 
     reprice = commands.add_parser("reprice", help="estimate DeepSeek costs from saved experiment traces")
     reprice.add_argument("--experiment", type=Path, required=True)
@@ -186,14 +192,41 @@ def main() -> None:
     diff = commands.add_parser("trace-diff", help="show the first observable difference")
     diff.add_argument("left", type=Path)
     diff.add_argument("right", type=Path)
+    diff.add_argument("--report", action="store_true", help="show context, behavior, and accounting differences separately")
     verify = commands.add_parser("trace-verify", help="audit a saved trace and its artifacts")
     verify.add_argument("trace", type=Path)
     experiment_verify = commands.add_parser("experiment-verify", help="audit a batch experiment from saved traces")
     experiment_verify.add_argument("experiment", type=Path)
+    experiment_verify.add_argument("--anchor", type=Path, help="independent SHA-256 anchor")
+    experiment_seal = commands.add_parser("experiment-seal", help="save file hashes outside a complete experiment")
+    experiment_seal.add_argument("experiment", type=Path)
+    experiment_seal.add_argument("anchor", type=Path)
+    bundle_export = commands.add_parser("experiment-export", help="archive a complete experiment and its trace evidence")
+    bundle_export.add_argument("experiment", type=Path)
+    bundle_export.add_argument("anchor", type=Path)
+    bundle_export.add_argument("archive", type=Path)
+    bundle_verify = commands.add_parser("experiment-bundle-verify", help="verify an archived experiment")
+    bundle_verify.add_argument("archive", type=Path)
+    bundle_verify.add_argument("--trusted-anchor", type=Path, help="separately stored anchor to compare with archive")
     args = parser.parse_args()
 
     if args.command == "experiment-verify":
-        report = verify_experiment(args.experiment)
+        report = verify_anchor(args.experiment, args.anchor) if args.anchor else verify_experiment(args.experiment)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        if not report["ok"]:
+            raise SystemExit(1)
+        return
+
+    if args.command == "experiment-seal":
+        print(json.dumps(seal_experiment(args.experiment, args.anchor), ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "experiment-export":
+        print(json.dumps(export_experiment(args.experiment, args.anchor, args.archive), ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "experiment-bundle-verify":
+        report = verify_bundle(args.archive, args.trusted_anchor)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if not report["ok"]:
             raise SystemExit(1)
@@ -207,7 +240,8 @@ def main() -> None:
         return
 
     if args.command == "trace-diff":
-        print(json.dumps(first_difference(args.left, args.right), ensure_ascii=False, indent=2))
+        result = divergence_report(args.left, args.right) if args.report else first_difference(args.left, args.right)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return
 
     if args.command == "reprice":
@@ -220,7 +254,8 @@ def main() -> None:
         return
 
     if args.command == "eval":
-        case = load_case(args.manifest)
+        source_case = load_case(args.manifest)
+        case = replace(source_case, image=resolve_image_id(source_case.image))
         result = evaluate(
             case, _model(args, Path.cwd()),
             lambda workspace: _context(args.context, workspace), args.traces,
@@ -238,6 +273,8 @@ def main() -> None:
         return
 
     if args.command == "eval-batch":
+        if args.max_estimated_cost_usd is not None and not args.deepseek:
+            parser.error("--max-estimated-cost-usd requires --deepseek")
         plan = load_plan(args.plan)
         unknown = set(plan.strategies) - set(CONTEXT_NAMES)
         if unknown:
@@ -264,7 +301,8 @@ def main() -> None:
             default_label = f"script:{args.script.name}"
         elif args.deepseek:
             model_spec = {"type": "deepseek", "model": args.deepseek_model,
-                          "identity": f"deepseek:{args.deepseek_model}:https://api.deepseek.com"}
+                          "identity": f"deepseek:{args.deepseek_model}:https://api.deepseek.com",
+                          "max_output_tokens": args.deepseek_max_output_tokens}
             default_label = f"deepseek:{args.deepseek_model}"
         else:
             model_spec = {"type": "command", "argv_sha256": hashlib.sha256(args.model_argv.encode()).hexdigest(),
@@ -286,6 +324,9 @@ def main() -> None:
             args.model_label or default_label,
             model_config_hash,
             model_spec, pricing_snapshot,
+            image_resolver=resolve_image_id,
+            max_estimated_cost_usd=args.max_estimated_cost_usd,
+            max_output_tokens=args.deepseek_max_output_tokens,
         )
         print(json.dumps({"output": str(output), "summary": summary}, ensure_ascii=False, indent=2))
         return

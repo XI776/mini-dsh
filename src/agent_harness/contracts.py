@@ -24,6 +24,8 @@ class Usage:
     cost_usd: float | None = None
     known: bool = True
     cache_usage_known: bool = False
+    cost_source: str = "reported"
+    raw_usage: Mapping[str, Any] | None = None
 
     @property
     def total_tokens(self) -> int:
@@ -34,6 +36,8 @@ class Usage:
             raise ValueError("token counts must be nonnegative")
         if self.cost_usd is not None and self.cost_usd < 0:
             raise ValueError("cost must be nonnegative")
+        if self.cost_source not in {"reported", "estimated", "synthetic"}:
+            raise ValueError("cost_source must be reported, estimated, or synthetic")
 
 
 @dataclass(frozen=True)
@@ -129,3 +133,16 @@ class SessionStore(Protocol):
     def save_artifact(self, content: bytes) -> str: ...
 
     def save_artifact_stream(self, stream: BufferedIOBase) -> str: ...
+
+
+class ToolExecutor(Protocol):
+    permission: PermissionPolicy
+    tools: Mapping[str, Tool]
+
+    def schemas(self) -> list[Mapping[str, Any]]: ...
+
+    def execute(self, call: ToolCall, timeout_s: float) -> ToolResult: ...
+
+
+class EventSink(Protocol):
+    def emit(self, event: Event) -> None: ...

@@ -13,10 +13,15 @@ from .contracts import ContextView, ModelFailure, ModelResult, ToolCall, Usage
 from .process import run_process
 
 
-def _parse_response(response: Mapping[str, Any]) -> ModelResult:
+def _parse_response(response: Mapping[str, Any], default_cost_source: str = "reported") -> ModelResult:
     raw_usage = response.get("usage")
     try:
-        usage = Usage(**raw_usage) if isinstance(raw_usage, Mapping) else Usage(known=False)
+        if isinstance(raw_usage, Mapping):
+            normalized = dict(raw_usage)
+            normalized.setdefault("cost_source", default_cost_source)
+            usage = Usage(**normalized)
+        else:
+            usage = Usage(known=False)
     except (TypeError, ValueError) as exc:
         raise ModelFailure(f"invalid usage in model response: {exc}", Usage(known=False)) from exc
     try:
@@ -40,7 +45,7 @@ class ScriptedModel:
             raise ModelFailure("script has no response for this step", Usage(known=False))
         response = self.responses[self.index]
         self.index += 1
-        return _parse_response(response)
+        return _parse_response(response, default_cost_source="synthetic")
 
     def resume_from(self, completed_calls: int) -> None:
         if completed_calls < 0 or completed_calls > len(self.responses):

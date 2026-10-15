@@ -2,18 +2,19 @@ from __future__ import annotations
 
 import sys
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from agent_harness.agent import BudgetLimits
 from agent_harness.context import FullHistory
 from agent_harness.contracts import ContextView, ModelFailure, TerminalStatus, ToolCall
-from agent_harness.docker_runtime import DockerRunner, ReadOnlyMount
+from agent_harness.docker_runtime import DockerRunner, ReadOnlyMount, resolve_image_id
 from agent_harness.eval import EvaluationCase, evaluate
 from agent_harness.model import CommandModel, ScriptedModel
-from agent_harness.process import ProcessCapture
+from agent_harness.process import ProcessCapture, run_process
 from agent_harness.runtime import ShellTool, ToolRuntime, WorkspacePolicy
 from agent_harness.session import JsonlSession, read_trace
 from agent_harness.trace_verify import verify_trace
@@ -24,6 +25,16 @@ class VersionTwoTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
+
+    def test_docker_image_is_resolved_to_local_content_id(self) -> None:
+        image_id = "sha256:" + "b" * 64
+        with patch("agent_harness.docker_runtime.subprocess.run", return_value=Mock(stdout=image_id + "\n")) as run:
+            self.assertEqual(resolve_image_id("coding-agent-sandbox:1"), image_id)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0][-1], "coding-agent-sandbox:1")
+        with patch("agent_harness.docker_runtime.subprocess.run", return_value=Mock(stdout="mutable-tag\n")):
+            with self.assertRaises(RuntimeError):
+                resolve_image_id("coding-agent-sandbox:1")
 
     def test_command_model_json_protocol(self) -> None:
         bridge = self.root / "bridge.py"
@@ -40,6 +51,13 @@ class VersionTwoTests(unittest.TestCase):
         result = model.complete(view, [], 2)
         self.assertEqual(result.message, "hello")
         self.assertEqual(result.usage.total_tokens, 6)
+
+    def test_script_model_cost_is_marked_synthetic(self) -> None:
+        model = ScriptedModel([{"message": "done", "finish": True, "usage": {
+            "input_tokens": 2, "output_tokens": 1, "cost_usd": 0.01,
+        }}])
+        result = model.complete(ContextView(({"role": "user", "content": "task"},), (), "full_history"), [], 1)
+        self.assertEqual(result.usage.cost_source, "synthetic")
 
     def test_command_model_preserves_usage_on_failed_response(self) -> None:
         bridge = self.root / "failed_bridge.py"
@@ -65,6 +83,27 @@ class VersionTwoTests(unittest.TestCase):
             self.assertTrue(result.truncated)
             self.assertEqual(len(result.output), 32)
             self.assertEqual((session.root / "artifacts" / result.artifact_id).read_text(), "x" * 50000 + "\n")
+
+    def test_process_output_capture_stops_at_storage_quota(self) -> None:
+        with JsonlSession(self.root / "runs") as session:
+            result = run_process(
+                [sys.executable, "-c", "import os; os.write(1, b'x' * 100000)"],
+                self.root, 5, 32, session=session, max_capture_bytes=4096,
+            )
+            self.assertTrue(result.output_limit_exceeded)
+            self.assertEqual(result.total_bytes, 4096)
+            self.assertTrue(result.truncated)
+            self.assertEqual((session.root / "artifacts" / result.artifact_id).stat().st_size, 4096)
+
+    def test_session_artifact_quota_and_private_trace(self) -> None:
+        with JsonlSession(self.root / "runs", max_artifact_bytes=6) as session:
+            self.assertEqual(session.save_artifact(b"abc"), session.save_artifact(b"abc"))
+            with self.assertRaisesRegex(ValueError, "quota exceeded"):
+                session.save_artifact(b"defg")
+            self.assertEqual(len(list((session.root / "artifacts").iterdir())), 1)
+            if os.name == "posix":
+                self.assertEqual((session.root / "trace.jsonl").stat().st_mode & 0o777, 0o600)
+                self.assertEqual(session.root.stat().st_mode & 0o777, 0o700)
 
     def test_docker_command_uses_isolation_flags_and_extra_mount(self) -> None:
         workspace = self.root / "workspace"

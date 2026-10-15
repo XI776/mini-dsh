@@ -20,6 +20,15 @@ jobs:
         run: uv sync --locked --dev
       - name: Run test suite
         run: uv run --locked pytest
+      - name: Build deterministic evaluation image
+        run: docker build --provenance=false -t coding-agent-sandbox:1 -f benchmarks/Dockerfile .
+      - name: Run and verify deterministic evaluation
+        run: |
+          uv run --locked agent-harness eval-batch --plan benchmarks/plan.json --script-map benchmarks/scripts/map.json --output .runs/experiments/ci-fixtures
+          uv run --locked agent-harness experiment-verify .runs/experiments/ci-fixtures
+          uv run --locked agent-harness experiment-seal .runs/experiments/ci-fixtures /tmp/mini-dsh-ci-evidence.json
+          uv run --locked agent-harness experiment-export .runs/experiments/ci-fixtures /tmp/mini-dsh-ci-evidence.json /tmp/mini-dsh-ci-evidence.zip
+          uv run --locked agent-harness experiment-bundle-verify /tmp/mini-dsh-ci-evidence.zip --trusted-anchor /tmp/mini-dsh-ci-evidence.json
       - name: Compile package
         run: uv run --locked python -m compileall -q src/agent_harness
       - name: Check whitespace

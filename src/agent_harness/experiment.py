@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from datetime import datetime, timezone
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from statistics import mean, median
 from typing import Callable, Mapping
@@ -78,8 +79,15 @@ def _record(case: EvaluationCase, strategy: str, repetition: int, seed: int, res
         "cache_read_tokens": usage.cache_read_tokens,
         "cache_write_tokens": usage.cache_write_tokens,
         "total_tokens": usage.tokens,
-        "recorded_cost_usd": usage.cost_usd,
-        "estimated_cost_usd": usage.cost_usd if usage.unpriced_calls == 0 and usage.unknown_usage_calls == 0 else None,
+        "recorded_cost_usd": usage.reported_cost_usd,
+        "estimated_cost_usd": (
+            usage.estimated_cost_usd
+            if usage.unestimated_cost_calls == 0 and usage.unknown_usage_calls == 0 else None
+        ),
+        "unreported_cost_calls": usage.unreported_cost_calls,
+        "unestimated_cost_calls": usage.unestimated_cost_calls,
+        "uncached_input_tokens": usage.input_tokens - usage.cache_read_tokens if cache_known else None,
+        "total_billable_tokens": usage.tokens if usage.unknown_usage_calls == 0 else None,
         "cache_hit_rate": usage.cache_read_tokens / usage.input_tokens if cache_known and usage.input_tokens else None,
         "context_tokens_estimated": sum(event["payload"]["estimated_tokens"] for event in events if event["type"] == "context_view"),
         "model_identity": start["model"],
@@ -89,6 +97,7 @@ def _record(case: EvaluationCase, strategy: str, repetition: int, seed: int, res
         "evaluation_version": EVALUATION_VERSION,
         "unpriced_calls": usage.unpriced_calls,
         "unknown_usage_calls": usage.unknown_usage_calls,
+        "token_usage_complete": usage.unknown_usage_calls == 0,
         "agent_wall_ms": terminal["monotonic_ms"],
         "evaluation_wall_ms": events[-1]["monotonic_ms"],
     }
@@ -98,10 +107,11 @@ def summarize(records: list[Mapping[str, object]], schema_version: int = 1) -> d
     result: dict[str, dict] = {}
     for strategy in sorted({str(record["strategy"]) for record in records}):
         rows = [record for record in records if record["strategy"] == strategy]
+        tokens_complete = all(row.get("token_usage_complete", True) for row in rows)
         hard = [row for row in rows if row["holdout_pass"] is not None]
         fully_priced = [
             row for row in rows
-            if row["unpriced_calls"] == 0
+            if row.get("unreported_cost_calls", row["unpriced_calls"]) == 0
             and (schema_version == 1 or row["unknown_usage_calls"] == 0)
         ]
         result[strategy] = {
@@ -110,12 +120,12 @@ def summarize(records: list[Mapping[str, object]], schema_version: int = 1) -> d
             "success_rate": mean(bool(row["success"]) for row in rows),
             "public_pass_rate": mean(bool(row["public_pass"]) for row in rows),
             "holdout_pass_rate": mean(bool(row["holdout_pass"]) for row in hard) if hard else None,
-            "mean_input_tokens": mean(int(row["input_tokens"]) for row in rows),
-            "mean_output_tokens": mean(int(row["output_tokens"]) for row in rows),
-            "mean_total_tokens": mean(int(row["total_tokens"]) for row in rows),
-            "median_total_tokens": median(int(row["total_tokens"]) for row in rows),
-            "mean_cache_read_tokens": mean(int(row["cache_read_tokens"]) for row in rows),
-            "mean_cache_write_tokens": mean(int(row["cache_write_tokens"]) for row in rows),
+            "mean_input_tokens": mean(int(row["input_tokens"]) for row in rows) if tokens_complete else None,
+            "mean_output_tokens": mean(int(row["output_tokens"]) for row in rows) if tokens_complete else None,
+            "mean_total_tokens": mean(int(row["total_tokens"]) for row in rows) if tokens_complete else None,
+            "median_total_tokens": median(int(row["total_tokens"]) for row in rows) if tokens_complete else None,
+            "mean_cache_read_tokens": mean(int(row["cache_read_tokens"]) for row in rows) if tokens_complete else None,
+            "mean_cache_write_tokens": mean(int(row["cache_write_tokens"]) for row in rows) if tokens_complete else None,
             "mean_agent_wall_ms": mean(int(row["agent_wall_ms"]) for row in rows),
             "mean_evaluation_wall_ms": mean(int(row["evaluation_wall_ms"]) for row in rows),
             "budget_exhausted_rate": mean(row["agent_status"] == "budget_exhausted" for row in rows),
@@ -142,8 +152,8 @@ def summarize(records: list[Mapping[str, object]], schema_version: int = 1) -> d
                 "mean_tool_calls": mean(int(row["tool_calls"]) for row in rows),
                 "mean_tool_errors": mean(int(row["tool_errors"]) for row in rows),
                 "mean_steps": mean(int(row["steps"]) for row in rows),
-                "min_total_tokens": min(int(row["total_tokens"]) for row in rows),
-                "max_total_tokens": max(int(row["total_tokens"]) for row in rows),
+                "min_total_tokens": min(int(row["total_tokens"]) for row in rows) if tokens_complete else None,
+                "max_total_tokens": max(int(row["total_tokens"]) for row in rows) if tokens_complete else None,
                 "min_evaluation_wall_ms": min(int(row["evaluation_wall_ms"]) for row in rows),
                 "max_evaluation_wall_ms": max(int(row["evaluation_wall_ms"]) for row in rows),
                 "mean_estimated_cost_usd": (
@@ -155,12 +165,15 @@ def summarize(records: list[Mapping[str, object]], schema_version: int = 1) -> d
                     if all(row["cache_hit_rate"] is not None for row in rows) else None
                 ),
             })
+            if any("token_usage_complete" in row for row in rows):
+                metrics["known_usage_runs"] = sum(bool(row.get("token_usage_complete", True)) for row in rows)
     baseline = result.get("full_history")
     if baseline:
         for strategy, metrics in result.items():
             baseline_tokens = baseline["mean_total_tokens"]
             metrics["token_change_vs_full_history_pct"] = (
-                100 * (metrics["mean_total_tokens"] / baseline_tokens - 1) if baseline_tokens else None
+                100 * (metrics["mean_total_tokens"] / baseline_tokens - 1)
+                if baseline_tokens and metrics["mean_total_tokens"] is not None else None
             )
             baseline_cost = baseline["mean_cost_usd"]
             strategy_cost = metrics["mean_cost_usd"]
@@ -181,10 +194,31 @@ def run_experiment(
     model_config_hash: str,
     model_spec: Mapping[str, object] | None = None,
     pricing_snapshot: Mapping[str, object] | None = None,
+    image_resolver: Callable[[str], str] | None = None,
+    max_estimated_cost_usd: float | None = None,
+    max_output_tokens: int | None = None,
 ) -> dict[str, dict]:
-    cases = [load_case(path) for path in plan.cases]
+    source_cases = [load_case(path) for path in plan.cases]
+    resolved_images = {case.image: image_resolver(case.image) for case in source_cases} if image_resolver else {}
+    cases = [replace(case, image=resolved_images[case.image]) for case in source_cases] if image_resolver else source_cases
     if len({case.case_id for case in cases}) != len(cases):
         raise ValueError("experiment case IDs must be unique")
+    if max_estimated_cost_usd is not None:
+        if (not isinstance(max_estimated_cost_usd, (int, float)) or isinstance(max_estimated_cost_usd, bool)
+                or not math.isfinite(max_estimated_cost_usd) or max_estimated_cost_usd <= 0):
+            raise ValueError("max_estimated_cost_usd must be positive and finite")
+        if pricing_snapshot is None or max_output_tokens is None:
+            raise ValueError("cost guard requires a price snapshot and max output tokens")
+        highest_price = max(float(pricing_snapshot[key]) for key in ("cache_hit", "cache_miss", "output"))
+        per_case_reserve = {
+            case.case_id: (2 * case.limits.tokens + max_output_tokens) * highest_price / 1_000_000
+            for case in cases
+        }
+        planned_upper_estimate = sum(
+            per_case_reserve[case.case_id] for case in cases
+        ) * len(plan.strategies) * plan.repetitions
+        if planned_upper_estimate > max_estimated_cost_usd:
+            raise ValueError(f"planned conservative cost estimate ${planned_upper_estimate:.6f} exceeds cap ${max_estimated_cost_usd:.6f}")
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=False)
     started_at = datetime.now(timezone.utc).isoformat()
@@ -211,9 +245,15 @@ def run_experiment(
         ),
         "context_configs": context_configs,
         "strategy_schedule": "rotate_by_repetition",
+        "image_resolution": "local_image_id" if image_resolver else "unresolved",
+        "cost_guard": ({"max_estimated_cost_usd": max_estimated_cost_usd,
+                        "planned_conservative_estimate_usd": planned_upper_estimate,
+                        "per_case_reserve_usd": per_case_reserve,
+                        "method": "known_estimate_or_unknown_usage_reserve"}
+                       if max_estimated_cost_usd is not None else None),
         "metric_sources": {
             "tokens": "model_usage_or_script_usage", "context_tokens_estimated": "local_context_view_estimate",
-            "recorded_cost": "model_reported_or_price_snapshot_estimate",
+            "recorded_cost": "provider_reported_only",
             "estimated_cost": "price_snapshot_estimate_if_all_calls_priced",
             "success": "post_run_tests",
             "cache_hit_rate": "provider_breakdown_only",
@@ -226,6 +266,7 @@ def run_experiment(
                 "task": case.task,
                 "limits": asdict(case.limits),
                 "image": case.image,
+                "image_source": source_case.image,
                 "public_test": list(case.public_test),
                 "holdout_test": list(case.holdout_test),
                 "allowed_commands": list(case.allowed_commands),
@@ -236,8 +277,9 @@ def run_experiment(
                     for name, content in (case.holdout_files or {}).items()
                 },
             }
-            for path, case in zip(plan.cases, cases)
+            for path, case, source_case in zip(plan.cases, cases, source_cases)
         },
+        "cost_accounting_version": 2,
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     records: list[dict] = []
@@ -254,10 +296,18 @@ def run_experiment(
                     record = _record(case, strategy, repetition, seed, result)
                     if pricing_snapshot is None:
                         record["estimated_cost_usd"] = None
+                    if max_estimated_cost_usd is not None:
+                        record["cost_guard_accounted_usd"] = (
+                            record["estimated_cost_usd"] if record["estimated_cost_usd"] is not None
+                            else per_case_reserve[case.case_id]
+                        )
                     record["trace_relpath"] = os.path.relpath(result.trace.resolve(), output_dir.resolve())
                     records.append(record)
                     stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
                     stream.flush()
+                    if max_estimated_cost_usd is not None:
+                        if sum(row["cost_guard_accounted_usd"] for row in records) > max_estimated_cost_usd:
+                            raise RuntimeError("cost guard stopped: accounted spend exceeded the cap")
     summary = summarize(records, schema_version=2)
     (output_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
     manifest["status"] = "complete"

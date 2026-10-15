@@ -21,6 +21,7 @@ class PluginGroup:
 
     def __post_init__(self) -> None:
         self._started: list[Plugin] = []
+        self._active = False
 
     def ordered(self) -> list[Plugin]:
         by_name = {plugin.name: plugin for plugin in self.plugins}
@@ -49,17 +50,29 @@ class PluginGroup:
         return result
 
     def start(self) -> None:
+        if self._active or self._started:
+            raise RuntimeError("plugin group is already starting or running")
         for plugin in self.ordered():
+            # start() may allocate resources before it raises. Include that
+            # plugin in rollback as well as its successfully started peers.
+            self._started.append(plugin)
             try:
                 plugin.start()
-                self._started.append(plugin)
-            except BaseException:
-                self.close()
+            except BaseException as exc:
+                try:
+                    self.close()
+                except Exception as cleanup_error:
+                    exc.add_note(f"plugin rollback also failed: {cleanup_error}")
                 raise
+        self._active = True
 
     def close(self) -> None:
+        errors: list[Exception] = []
         while self._started:
             try:
                 self._started.pop().close()
-            except Exception:
-                pass
+            except Exception as exc:
+                errors.append(exc)
+        self._active = False
+        if errors:
+            raise ExceptionGroup("plugin cleanup failed", errors)

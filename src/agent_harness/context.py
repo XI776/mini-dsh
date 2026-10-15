@@ -41,8 +41,12 @@ def _history(events: Sequence[Event]) -> list[tuple[int, dict[str, str]]]:
     return history
 
 
-def _fit(task: str, entries: list[tuple[int, dict[str, str]]], budget: int | None) -> tuple[tuple[dict[str, str], ...], tuple[int, ...]]:
+def _fit(
+    task: str, entries: list[tuple[int, dict[str, str]]], budget: int | None,
+) -> tuple[tuple[dict[str, str], ...], tuple[int, ...], dict[str, Any]]:
     base = {"role": "user", "content": task}
+    original_ids = [seq for seq, _ in entries if seq > 0]
+    truncated_id = None
     if budget is not None:
         # A conservative local estimate, replaced by provider tokenization when available.
         allowed_chars = max(0, budget * 3 - len(task))
@@ -55,11 +59,19 @@ def _fit(task: str, entries: list[tuple[int, dict[str, str]]], budget: int | Non
             elif allowed_chars > 16:
                 clipped = {**entry[1], "content": "[truncated]\n" + entry[1]["content"][-(allowed_chars - 12) :]}
                 kept.append((entry[0], clipped))
+                truncated_id = entry[0] if entry[0] > 0 else None
                 break
             else:
                 break
         entries = list(reversed(kept))
-    return (base, *(entry[1] for entry in entries)), tuple(entry[0] for entry in entries if entry[0] > 0)
+    ids = tuple(entry[0] for entry in entries if entry[0] > 0)
+    selection = {
+        "retained_event_ids": list(ids),
+        "dropped_event_ids": [seq for seq in original_ids if seq not in ids],
+        "truncated_event_id": truncated_id,
+        "reason": "token_budget" if truncated_id is not None or len(ids) < len(original_ids) else None,
+    }
+    return (base, *(entry[1] for entry in entries)), ids, selection
 
 
 def _workspace_mutations(events: Sequence[Event], after_seq: int) -> list[int]:
@@ -140,8 +152,8 @@ class FullHistory:
         return {}
 
     def build(self, events: Sequence[Event], task: str, token_budget: int | None) -> ContextView:
-        messages, ids = _fit(task, _history(events), token_budget)
-        return ContextView(messages, ids, self.name)
+        messages, ids, selection = _fit(task, _history(events), token_budget)
+        return ContextView(messages, ids, self.name, {"selection": selection})
 
 
 class SlidingWindow:
@@ -156,8 +168,13 @@ class SlidingWindow:
         return {"recent_events": self.recent_events}
 
     def build(self, events: Sequence[Event], task: str, token_budget: int | None) -> ContextView:
-        messages, ids = _fit(task, _history(events)[-self.recent_events :], token_budget)
-        return ContextView(messages, ids, self.name, {"recent_events": self.recent_events})
+        history = _history(events)
+        messages, ids, selection = _fit(task, history[-self.recent_events :], token_budget)
+        dropped = history[:-self.recent_events]
+        return ContextView(messages, ids, self.name, {
+            "recent_events": self.recent_events, "selection": selection,
+            "window_dropped_range": [dropped[0][0], dropped[-1][0]] if dropped else None,
+        })
 
 
 class SummaryContext:
@@ -182,12 +199,13 @@ class SummaryContext:
         if len(summary) > self.summary_chars:
             summary = summary[: self.summary_chars] + "…"
         entries = ([(older[-1][0], {"role": "system", "content": "Earlier events summary:\n" + summary})] if older else []) + recent
-        messages, ids = _fit(task, entries, token_budget)
+        messages, ids, selection = _fit(task, entries, token_budget)
         return ContextView(
             messages,
             ids,
             self.name,
-            {"summarized_range": [older[0][0], older[-1][0]] if older else None, "reason": "event_window"},
+            {"summarized_range": [older[0][0], older[-1][0]] if older else None,
+             "reason": "event_window", "selection": selection},
         )
 
 
@@ -253,8 +271,13 @@ class RepositoryContext:
         hits = self.index.search(query)
         snippets = "\n".join(f"{path}:{line_no}: {line}" for path, line_no, line in hits)
         entries = ([(0, {"role": "system", "content": "Repository matches:\n" + snippets})] if hits else []) + history[-self.recent_events :]
-        messages, ids = _fit(task, entries, token_budget)
-        metadata: dict[str, Any] = {"snapshot_id": self.index.snapshot_id, "hits": [f"{p}:{n}" for p, n, _ in hits]}
+        messages, ids, selection = _fit(task, entries, token_budget)
+        dropped = history[:-self.recent_events]
+        metadata: dict[str, Any] = {
+            "snapshot_id": self.index.snapshot_id, "hits": [f"{p}:{n}" for p, n, _ in hits],
+            "selection": selection,
+            "window_dropped_range": [dropped[0][0], dropped[-1][0]] if dropped else None,
+        }
         if refresh:
             metadata["index_refresh"] = refresh
         return ContextView(messages, ids, self.name, metadata)
@@ -276,8 +299,8 @@ class RetrievalSummaryContext:
         extras = [(0, dict(message)) for message in summary_view.messages[1:-self.summary.recent_events]]
         extras += [(0, dict(message)) for message in retrieval_view.messages[1:] if message["role"] == "system"]
         extras += _history(events)[-self.summary.recent_events :]
-        messages, ids = _fit(task, extras, token_budget)
-        return ContextView(messages, ids, self.name, {**summary_view.metadata, **retrieval_view.metadata})
+        messages, ids, selection = _fit(task, extras, token_budget)
+        return ContextView(messages, ids, self.name, {**summary_view.metadata, **retrieval_view.metadata, "selection": selection})
 
 
 class PythonSymbolContext:
@@ -323,8 +346,14 @@ class PythonSymbolContext:
         hits = [(name, path, line) for name, path, line in self.symbols if name.lower() in terms][:12]
         entries = ([(0, {"role": "system", "content": "Python symbols:\n" + "\n".join(f"{p}:{n}: {s}" for s, p, n in hits)})] if hits else [])
         entries += _history(events)[-self.recent_events :]
-        messages, ids = _fit(task, entries, token_budget)
-        metadata: dict[str, Any] = {"snapshot_id": self.snapshot_id, "hits": [f"{p}:{n}" for _, p, n in hits]}
+        messages, ids, selection = _fit(task, entries, token_budget)
+        history = _history(events)
+        dropped = history[:-self.recent_events]
+        metadata: dict[str, Any] = {
+            "snapshot_id": self.snapshot_id, "hits": [f"{p}:{n}" for _, p, n in hits],
+            "selection": selection,
+            "window_dropped_range": [dropped[0][0], dropped[-1][0]] if dropped else None,
+        }
         if refresh:
             metadata["index_refresh"] = refresh
         return ContextView(messages, ids, self.name, metadata)

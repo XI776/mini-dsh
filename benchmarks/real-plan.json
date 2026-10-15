@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "experiment_id": "real-context-ablation",
+  "cases": ["addition.json", "cross_file.json"],
+  "strategies": ["full_history", "sliding_window", "summary", "repository", "retrieval_summary", "python_symbols"],
+  "repetitions": 3,
+  "base_seed": 42
+}

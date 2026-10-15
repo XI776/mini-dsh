@@ -269,9 +269,9 @@ class ShellTool:
         )
         return ToolResult(
             call_id="",
-            status="ok" if capture.exit_code == 0 else "error",
+            status="ok" if capture.exit_code == 0 and not capture.output_limit_exceeded else "error",
             output=capture.output,
-            error_code=None if capture.exit_code == 0 else "nonzero_exit",
+            error_code="output_limit_exceeded" if capture.output_limit_exceeded else None if capture.exit_code == 0 else "nonzero_exit",
             exit_code=capture.exit_code,
             artifact_id=capture.artifact_id,
             truncated=capture.truncated,
@@ -307,8 +307,8 @@ class GitTool:
             session=self.session, environment=environment,
         )
         return ToolResult(
-            "", "ok" if capture.exit_code == 0 else "error", capture.output,
-            None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
+            "", "ok" if capture.exit_code == 0 and not capture.output_limit_exceeded else "error", capture.output,
+            "output_limit_exceeded" if capture.output_limit_exceeded else None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
             capture.artifact_id, capture.truncated,
         )
 
@@ -334,8 +334,8 @@ class ConfiguredCommandTool:
         environment = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL", "HOME") if key in os.environ}
         capture = run_process(self.argv, self.workspace, timeout_s, self.output_limit, session=self.session, environment=environment)
         return ToolResult(
-            "", "ok" if capture.exit_code == 0 else "error", capture.output,
-            None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
+            "", "ok" if capture.exit_code == 0 and not capture.output_limit_exceeded else "error", capture.output,
+            "output_limit_exceeded" if capture.output_limit_exceeded else None if capture.exit_code == 0 else "nonzero_exit", capture.exit_code,
             capture.artifact_id, capture.truncated,
         )
 
