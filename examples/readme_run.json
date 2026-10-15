@@ -1,0 +1,13 @@
+[
+  {
+    "tool_calls": [
+      {"name": "read_file", "arguments": {"path": "README.md"}}
+    ],
+    "usage": {"input_tokens": 12, "output_tokens": 8}
+  },
+  {
+    "message": "README read successfully.",
+    "finish": true,
+    "usage": {"input_tokens": 20, "output_tokens": 5}
+  }
+]

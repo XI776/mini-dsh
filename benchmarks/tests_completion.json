@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "tests-completion", "task": "Add a unittest for multiply(3, 4) in tests/test_multiply.py.",
+  "baseline": "tests_completion/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import ast, pathlib, unittest\nclass Hidden(unittest.TestCase):\n    def test_new_test_exists(self):\n        path = pathlib.Path('/workspace/tests/test_multiply.py')\n        self.assertTrue(path.is_file())\n        tree = ast.parse(path.read_text())\n        self.assertTrue(any(isinstance(n, ast.FunctionDef) and n.name.startswith('test_') for n in ast.walk(tree)))\n"},
+  "limits": {"steps": 6, "tokens": 6000, "tool_calls": 6, "wall_seconds": 60}
+}

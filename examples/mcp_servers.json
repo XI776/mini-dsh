@@ -1,0 +1,9 @@
+{
+  "servers": [
+    {
+      "name": "example",
+      "argv": ["python", "mcp_echo_server.py"],
+      "side_effects": {"echo": "read"}
+    }
+  ]
+}

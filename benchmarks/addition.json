@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "simple-bug", "task": "Fix add in calculator.py.",
+  "baseline": "addition/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import unittest\nfrom calculator import add\nclass Hidden(unittest.TestCase):\n    def test_negative(self): self.assertEqual(add(-2, -3), -5)\n"},
+  "limits": {"steps": 6, "tokens": 6000, "tool_calls": 6, "wall_seconds": 60}
+}

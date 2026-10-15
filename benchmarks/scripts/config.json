@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "settings.py", "content": "DEFAULT_PORT = 8080\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Fixed.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "pricing.py", "content": "from config import DISCOUNT_RATE\n\ndef discounted(price):\n    return price * (1 - DISCOUNT_RATE)\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Fixed.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

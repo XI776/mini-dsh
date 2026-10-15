@@ -1,0 +1,1 @@
+DISCOUNT_RATE = 0.10

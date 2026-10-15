@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "config-repair", "task": "Fix the default port type in settings.py; it must be an integer.",
+  "baseline": "config/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import unittest\nfrom settings import DEFAULT_PORT\nclass Hidden(unittest.TestCase):\n    def test_numeric(self): self.assertIs(type(DEFAULT_PORT), int)\n    def test_range(self): self.assertTrue(1 <= DEFAULT_PORT <= 65535)\n"},
+  "limits": {"steps": 6, "tokens": 6000, "tool_calls": 6, "wall_seconds": 60}
+}

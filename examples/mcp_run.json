@@ -1,0 +1,13 @@
+[
+  {
+    "tool_calls": [
+      {"name": "mcp.example.echo", "arguments": {"text": "MCP works"}}
+    ],
+    "usage": {"input_tokens": 5, "output_tokens": 3}
+  },
+  {
+    "message": "Echo completed.",
+    "finish": true,
+    "usage": {"input_tokens": 8, "output_tokens": 3}
+  }
+]

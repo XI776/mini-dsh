@@ -1,0 +1,8 @@
+{
+  "simple-bug": "addition.json",
+  "cross-file-bug": "cross_file.json",
+  "tests-completion": "tests_completion.json",
+  "small-feature": "feature.json",
+  "config-repair": "config.json",
+  "repository-search": "repository.json"
+}

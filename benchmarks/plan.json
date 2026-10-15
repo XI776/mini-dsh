@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "experiment_id": "local-fixtures",
+  "cases": ["addition.json", "cross_file.json", "tests_completion.json", "feature.json", "config.json", "repository.json"],
+  "strategies": ["full_history", "sliding_window", "summary", "repository", "retrieval_summary", "python_symbols"],
+  "repetitions": 1,
+  "base_seed": 42
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "cross-file-bug", "task": "Fix the discount calculation using the rate in config.py.",
+  "baseline": "cross_file/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import unittest\nfrom pricing import discounted\nclass Hidden(unittest.TestCase):\n    def test_zero(self): self.assertEqual(discounted(0), 0)\n    def test_other(self): self.assertEqual(discounted(200), 180)\n"},
+  "limits": {"steps": 8, "tokens": 6000, "tool_calls": 8, "wall_seconds": 60}
+}

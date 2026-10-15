@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "experiment_id": "context-example",
+  "cases": ["eval_case.json"],
+  "strategies": [
+    "full_history",
+    "sliding_window",
+    "summary",
+    "repository",
+    "retrieval_summary",
+    "python_symbols"
+  ],
+  "repetitions": 1,
+  "base_seed": 42
+}

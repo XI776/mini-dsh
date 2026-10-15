@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "tests/test_multiply.py", "content": "import unittest\nfrom mathops import multiply\n\nclass MultiplyTests(unittest.TestCase):\n    def test_positive(self):\n        self.assertEqual(multiply(3, 4), 12)\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Added test.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

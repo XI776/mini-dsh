@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "slug.py", "content": "def slugify(text):\n    return '-'.join(text.lower().split())\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Implemented.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

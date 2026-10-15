@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "calculator.py", "content": "def add(a, b):\n    return a + b\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Fixed.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

@@ -1,0 +1,4 @@
+[
+  {"tool_calls": [{"name": "write_file", "arguments": {"path": "package/formatting.py", "content": "def normalize_name(name):\n    return name.strip().lower()\n"}}], "usage": {"input_tokens": 20, "output_tokens": 20}},
+  {"message": "Fixed.", "finish": true, "usage": {"input_tokens": 30, "output_tokens": 5}}
+]

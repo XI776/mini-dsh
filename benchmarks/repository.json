@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "repository-search", "task": "Find normalize_name in the package and make it remove surrounding spaces and lowercase names.",
+  "baseline": "repository/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import unittest\nfrom package.formatting import normalize_name\nclass Hidden(unittest.TestCase):\n    def test_mixed(self): self.assertEqual(normalize_name('  AlIce  '), 'alice')\n"},
+  "limits": {"steps": 8, "tokens": 6000, "tool_calls": 8, "wall_seconds": 60}
+}

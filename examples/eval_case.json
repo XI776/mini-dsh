@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "case_id": "addition-example",
+  "task": "Fix calculator.add so it returns the sum of two integers.",
+  "baseline": "eval_baseline",
+  "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests", "-v"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout", "-v"],
+  "holdout_files": {
+    "test_hidden.py": "import unittest\nfrom calculator import add\n\nclass HiddenTests(unittest.TestCase):\n    def test_negative_numbers(self):\n        self.assertEqual(add(-2, -3), -5)\n    def test_zero(self):\n        self.assertEqual(add(0, 0), 0)\n"
+  },
+  "limits": {"steps": 8, "tokens": 6000, "tool_calls": 8, "wall_seconds": 90},
+  "test_timeout_s": 30
+}

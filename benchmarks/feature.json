@@ -1,0 +1,8 @@
+{
+  "schema_version": 1, "case_id": "small-feature", "task": "Implement slugify(text) in slug.py: trim, lowercase and replace whitespace runs with hyphens.",
+  "baseline": "feature/baseline", "image": "coding-agent-sandbox:1",
+  "public_test": ["python", "-m", "unittest", "discover", "-s", "tests"],
+  "holdout_test": ["python", "-m", "unittest", "discover", "-s", "/holdout"],
+  "holdout_files": {"test_hidden.py": "import unittest\nfrom slug import slugify\nclass Hidden(unittest.TestCase):\n    def test_tabs(self): self.assertEqual(slugify(' A\\t B '), 'a-b')\n    def test_empty(self): self.assertEqual(slugify('  '), '')\n"},
+  "limits": {"steps": 6, "tokens": 6000, "tool_calls": 6, "wall_seconds": 60}
+}
