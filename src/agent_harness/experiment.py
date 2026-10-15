@@ -6,6 +6,8 @@ import hashlib
 import json
 import math
 import os
+import time
+from threading import Event, Thread
 from datetime import datetime, timezone
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -30,6 +32,21 @@ class ExperimentPlan:
             raise ValueError("experiment id, cases and strategies are required")
         if self.repetitions < 1 or len(set(self.strategies)) != len(self.strategies):
             raise ValueError("repetitions must be positive and strategies unique")
+
+
+@dataclass(frozen=True)
+class ExperimentProgress:
+    phase: str
+    index: int
+    total: int
+    completed: int
+    case_id: str
+    strategy: str
+    repetition: int
+    elapsed_s: float
+    run_elapsed_s: float
+    eta_s: float | None
+    success: bool | None = None
 
 
 def load_plan(path: Path) -> ExperimentPlan:
@@ -197,7 +214,11 @@ def run_experiment(
     image_resolver: Callable[[str], str] | None = None,
     max_estimated_cost_usd: float | None = None,
     max_output_tokens: int | None = None,
+    progress: Callable[[ExperimentProgress], None] | None = None,
+    progress_interval_s: float = 0,
 ) -> dict[str, dict]:
+    if not math.isfinite(progress_interval_s) or progress_interval_s < 0:
+        raise ValueError("progress interval must be finite and nonnegative")
     source_cases = [load_case(path) for path in plan.cases]
     resolved_images = {case.image: image_resolver(case.image) for case in source_cases} if image_resolver else {}
     cases = [replace(case, image=resolved_images[case.image]) for case in source_cases] if image_resolver else source_cases
@@ -283,16 +304,51 @@ def run_experiment(
     }
     (output_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     records: list[dict] = []
+    total_runs = manifest["expected_runs"]
+    batch_started = time.monotonic()
     with (output_dir / "runs.jsonl").open("x", encoding="utf-8") as stream:
         for case in cases:
             for repetition in range(plan.repetitions):
                 seed = plan.base_seed + repetition
                 ordered_strategies = plan.strategies[repetition % len(plan.strategies):] + plan.strategies[:repetition % len(plan.strategies)]
                 for strategy in ordered_strategies:
-                    model = model_factory(case, strategy, repetition, seed)
-                    result = evaluate(
-                        case, model, lambda workspace, name=strategy: context_factory(name, workspace), traces_root
-                    )
+                    index = len(records) + 1
+                    run_started = time.monotonic()
+
+                    def emit(phase: str, success: bool | None = None) -> None:
+                        if progress is None:
+                            return
+                        elapsed = time.monotonic() - batch_started
+                        completed = len(records)
+                        progress(ExperimentProgress(
+                            phase, index, total_runs, completed, case.case_id, strategy, repetition,
+                            elapsed, time.monotonic() - run_started,
+                            elapsed / completed * (total_runs - completed) if completed else None,
+                            success,
+                        ))
+
+                    emit("started")
+                    stop_heartbeat = Event()
+                    heartbeat = None
+                    if progress is not None and progress_interval_s:
+                        def pulse() -> None:
+                            while not stop_heartbeat.wait(progress_interval_s):
+                                emit("running")
+
+                        heartbeat = Thread(target=pulse, name="mini-dsh-progress", daemon=True)
+                        heartbeat.start()
+                    try:
+                        model = model_factory(case, strategy, repetition, seed)
+                        result = evaluate(
+                            case, model, lambda workspace, name=strategy: context_factory(name, workspace), traces_root
+                        )
+                    except BaseException:
+                        emit("failed")
+                        raise
+                    finally:
+                        stop_heartbeat.set()
+                        if heartbeat is not None:
+                            heartbeat.join()
                     record = _record(case, strategy, repetition, seed, result)
                     if pricing_snapshot is None:
                         record["estimated_cost_usd"] = None
@@ -305,6 +361,7 @@ def run_experiment(
                     records.append(record)
                     stream.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
                     stream.flush()
+                    emit("completed", result.success)
                     if max_estimated_cost_usd is not None:
                         if sum(row["cost_guard_accounted_usd"] for row in records) > max_estimated_cost_usd:
                             raise RuntimeError("cost guard stopped: accounted spend exceeded the cap")

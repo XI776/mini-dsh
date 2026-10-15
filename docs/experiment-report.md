@@ -1,5 +1,33 @@
 # 实验与费用证据（2026-10-15）
 
+## 正式真实模型批次：六任务、三次重复
+
+`.runs/experiments/real-context-20261015-180556` 使用 `benchmarks/real-context-plan-3.json` 的六个任务、六种 Context 策略和每个任务/策略三次重复，共 **108 次 DeepSeek Flash 运行**。Manifest 状态为 `complete`，108/108 条 Trace、输入快照和外部锚点中的 137 个文件均通过校验；可搬运 ZIP 的 176 个文件与 6 个任务输入快照也通过独立锚点验包。锚点为 [`evidence/real-context-20261015-180556.json`](evidence/real-context-20261015-180556.json)，ZIP 的 SHA-256 为 `d799c20b464cd949f6f042aee6e66a1ef3cdf7588fe74bd084c58035b6d29f6e`。原始运行与 ZIP 目前只保存在本机被 Git 忽略的 `.runs/` 和 `.exports/`。
+
+实验固定任务输入哈希、本地 Docker 镜像 ID `sha256:f94cc1837dfaef77a81157135c8b0abb2848182519e1a46012ce1b56f5bd06c4`、模型 `deepseek-flash`、每次请求最多 8192 输出 Token、每次任务最多 50 步/200,000 Token/100 次工具调用/1800 秒，以及版本化的 `benchmarks/pricing/deepseek-flash-offpeak-20261015.json` 价格快照。策略顺序按重复编号轮换。Manifest 的 seed 为 42–44，但 DeepSeek 适配器不发送 seed，因此不能据此声称模型输出可确定性重放。
+
+**70/108 次**同时通过运行后的公开与留出测试（64.8%）；另外 38 次未通过。108 次均有完整模型 Usage 和提供方缓存拆分，未出现未知 Usage。35 次 Agent 以预算耗尽结束；测试成功与 Agent 终态分别统计，不能把预算耗尽数直接从成功数中相减。实验自 2026-10-15 10:05:57 UTC 至 12:17:34 UTC，约 2 小时 12 分钟。按实验保存的非峰时价格快照，成功响应的模型用量合计**估算 $1.040866**；DeepSeek 没有返回实际账单费用，重试中无 Usage 的请求可能不在本地估算内。
+
+| Context | 测试成功/18 | 预算耗尽/18 | 总 Token 中位数/次 | Agent 步数中位数/次 | 缓存命中率中位数 | 18 次费用估算 USD |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| full_history | 13 | 0 | 13,391.5 | 6 | 76.0% | 0.037684 |
+| sliding_window | 12 | 3 | 27,630 | 13.5 | 38.8% | 0.131393 |
+| summary | 12 | 8 | 82,768 | 31.5 | 46.4% | 0.221020 |
+| repository | 9 | 5 | 53,086 | 26 | 43.7% | 0.156464 |
+| retrieval_summary | 12 | 12 | 105,164.5 | 45 | 41.4% | 0.327116 |
+| python_symbols | 12 | 7 | 52,230 | 35.5 | 45.3% | 0.167188 |
+
+`experiment-report` 还按任务内中位数与 `full_history` 配对，再取六个任务差值的中位数。例如 `summary` 的总 Token 为 **+463.1%**、估算费用为 **+355.8%**，缓存命中率为 **−31.7 个百分点**；`sliding_window` 分别为 **+145.7%**、**+304.2%** 和 **−37.0 个百分点**。这些数字描述这六个任务的实际执行，不是单次 Context 长度的直接变化：各策略产生的模型步数、工具调用和预算耗尽次数明显不同，因而总 Token 与费用受执行路径影响。样本只有六个小仓库、每格三次，任务顺序固定且供应商缓存/服务状态随时间变化，不能推广为策略的一般优劣或成本优化结论。
+
+```bash
+EXP=.runs/experiments/real-context-20261015-180556
+uv run --locked agent-harness experiment-verify "$EXP" --anchor docs/evidence/real-context-20261015-180556.json
+uv run --locked agent-harness experiment-report "$EXP" --baseline full_history
+uv run --locked agent-harness experiment-bundle-verify .exports/real-context-20261015-180556.zip --trusted-anchor docs/evidence/real-context-20261015-180556.json
+```
+
+两个可复核的失败归因见 [Trace 案例](trace-cases-20261015.md)。
+
 ## 已校验产物
 
 - `.runs/experiments/local-fixtures-3`：六个任务 × 六策略 × 一次，共 **36 次脚本模型运行**；36/36 Trace 与输入快照校验通过，公开及留出测试均通过。脚本动作和 Usage 是固定测试数据，不能用来比较策略成功率或模型费用。
@@ -48,4 +76,4 @@
 
 ## 未验证数字与环境
 
-没有找到可验证的“1,010 次离线执行”或历史所称“24 次真实 Context 对照”“10 次真实模型回归”的原始证据，因此不把这些历史数字作为本仓库结果。本轮新增的 36 次真实模型运行另有 Manifest、Trace 和锚点支持，但不等同于那些历史宣称。Docker Desktop 在授权的沙箱外可用；本地重新执行了容器评测。复现命令和指标定义见 [评测协议](evaluation.md)。
+没有找到可验证的“1,010 次离线执行”或历史所称“24 次真实 Context 对照”“10 次真实模型回归”的原始证据，因此不把这些历史数字作为本仓库结果。现在独立完成的 36 次与 108 次真实模型批次各有 Manifest、Trace 和锚点支持，但不能冒充那些历史宣称。Docker Desktop 在授权的沙箱外可用；本地重新执行了容器评测。复现命令和指标定义见 [评测协议](evaluation.md)。

@@ -5,12 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 from contextlib import ExitStack
 from dataclasses import asdict, replace
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
 from .agent import AgentLoop, BudgetLimits
+from .analysis import analyze_experiment, render_report
 from .bundle import export_experiment, verify_bundle
 from .context import (
     FullHistory, PythonSymbolContext, RepositoryContext, RepositoryIndex,
@@ -20,7 +23,7 @@ from .docker_runtime import DockerCommandTool, DockerRunner, DockerShellTool, re
 from .deepseek import DEFAULT_MODEL, DeepSeekModel, load_api_key, load_pricing
 from .evidence import seal_experiment, verify_anchor
 from .eval import evaluate, load_case
-from .experiment import load_plan, run_experiment
+from .experiment import ExperimentProgress, load_plan, run_experiment
 from .experiment_verify import verify_experiment
 from .model import CommandModel, ScriptedModel
 from .mcp_stdio import McpRemoteTool, McpStdioClient
@@ -38,6 +41,21 @@ from .trace_verify import verify_trace
 CONTEXT_NAMES = (
     "full_history", "sliding_window", "summary", "repository", "retrieval_summary", "python_symbols"
 )
+
+
+def _print_batch_progress(update: ExperimentProgress) -> None:
+    elapsed = str(timedelta(seconds=round(update.elapsed_s)))
+    run_elapsed = str(timedelta(seconds=round(update.run_elapsed_s)))
+    eta = "estimating" if update.eta_s is None else f"~{timedelta(seconds=round(update.eta_s))}"
+    outcome = ""
+    if update.phase == "completed":
+        outcome = f" success={'yes' if update.success else 'no'}"
+    print(
+        f"[{update.index}/{update.total}] {update.phase.upper()}"
+        f" case={update.case_id} strategy={update.strategy} repetition={update.repetition + 1}"
+        f" run={run_elapsed} elapsed={elapsed} ETA={eta}{outcome}",
+        file=sys.stderr, flush=True,
+    )
 
 
 def _context(name: str, workspace: Path):
@@ -208,6 +226,10 @@ def main() -> None:
     bundle_verify = commands.add_parser("experiment-bundle-verify", help="verify an archived experiment")
     bundle_verify.add_argument("archive", type=Path)
     bundle_verify.add_argument("--trusted-anchor", type=Path, help="separately stored anchor to compare with archive")
+    experiment_report = commands.add_parser("experiment-report", help="compare strategies inside each case of a saved experiment")
+    experiment_report.add_argument("experiment", type=Path)
+    experiment_report.add_argument("--baseline", default="full_history", help="strategy every other strategy is compared against")
+    experiment_report.add_argument("--json-output", type=Path, help="also write the machine-readable report to this path")
     args = parser.parse_args()
 
     if args.command == "experiment-verify":
@@ -230,6 +252,13 @@ def main() -> None:
         print(json.dumps(report, ensure_ascii=False, indent=2))
         if not report["ok"]:
             raise SystemExit(1)
+        return
+
+    if args.command == "experiment-report":
+        report = analyze_experiment(args.experiment, args.baseline)
+        if args.json_output:
+            args.json_output.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        print(render_report(report))
         return
 
     if args.command == "trace-verify":
@@ -327,6 +356,8 @@ def main() -> None:
             image_resolver=resolve_image_id,
             max_estimated_cost_usd=args.max_estimated_cost_usd,
             max_output_tokens=args.deepseek_max_output_tokens,
+            progress=_print_batch_progress,
+            progress_interval_s=30,
         )
         print(json.dumps({"output": str(output), "summary": summary}, ensure_ascii=False, indent=2))
         return

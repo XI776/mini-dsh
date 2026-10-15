@@ -266,6 +266,24 @@ class DeepSeekTests(unittest.TestCase):
                 self.assertEqual(response.payload["attempts"], 2)
                 self.assertTrue(verify_trace(session.root / "trace.jsonl")["ok"])
 
+    def test_truncated_response_is_reported_and_not_retried(self) -> None:
+        attempts = []
+
+        def opener(*args, **kwargs):
+            attempts.append(1)
+            return FakeResponse({
+                "choices": [{"finish_reason": "length", "message": {"content": "def parse_duration("}}],
+                "usage": {"prompt_tokens": 900, "completion_tokens": 4096},
+            })
+
+        model = DeepSeekModel("secret", opener=opener, sleep=lambda _: None)
+        with self.assertRaises(ModelFailure) as failure:
+            model.complete(ContextView(({"role": "user", "content": "x"},), (), "full_history"), [], 30.0)
+        self.assertIn("truncated at the max_tokens limit", str(failure.exception))
+        self.assertEqual(failure.exception.attempts, 1)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(failure.exception.usage.total_tokens, 4996)
+
     def test_http_error_excludes_response_body_and_key(self) -> None:
         def opener(*args, **kwargs):
             raise urllib.error.HTTPError("https://api.deepseek.com", 401, "bad-secret", None, None)

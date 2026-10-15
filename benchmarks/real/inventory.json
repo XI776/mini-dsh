@@ -24,13 +24,23 @@
     "test_hidden.py": "import unittest\n\nfrom inventory.models import Item\nfrom inventory.pricing import summarize\n\n\nclass BoundaryTests(unittest.TestCase):\n    def test_exact_threshold_quantity(self):\n        totals = summarize([Item(100, 10)])\n        self.assertEqual(totals[\"total_cents\"], 900)\n        self.assertEqual(totals[\"discount_cents\"], 100)\n\n    def test_exact_top_threshold_quantity(self):\n        totals = summarize([Item(100, 50)])\n        self.assertEqual(totals[\"total_cents\"], 4000)\n        self.assertEqual(totals[\"discount_cents\"], 1000)\n\n    def test_line_totals_round_half_up(self):\n        totals = summarize([Item(1005, 11)])\n        self.assertEqual(totals[\"subtotal_cents\"], 11055)\n        self.assertEqual(totals[\"total_cents\"], 9950)\n\n    def test_tiers_apply_per_line(self):\n        totals = summarize([Item(100, 50), Item(100, 9)])\n        self.assertEqual(totals[\"subtotal_cents\"], 5900)\n        self.assertEqual(totals[\"discount_cents\"], 1000)\n        self.assertEqual(totals[\"total_cents\"], 4900)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
   },
   "allowed_commands": [
-    "python"
+    "python",
+    "ls",
+    "grep",
+    "find",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "sed",
+    "sort",
+    "uniq"
   ],
   "test_timeout_s": 60,
   "limits": {
-    "steps": 20,
-    "tokens": 100000,
-    "tool_calls": 20,
-    "wall_seconds": 420
+    "steps": 50,
+    "tokens": 200000,
+    "tool_calls": 100,
+    "wall_seconds": 1800
   }
 }

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "experiment_id": "real-context-ablation",
+  "cases": [
+    "real/duration.json",
+    "real/inventory.json",
+    "real/pipeline.json",
+    "real/textrefactor.json",
+    "real/config_migration.json",
+    "real/logtriage.json"
+  ],
+  "strategies": [
+    "full_history",
+    "sliding_window",
+    "summary",
+    "repository",
+    "retrieval_summary",
+    "python_symbols"
+  ],
+  "repetitions": 3,
+  "base_seed": 42
+}

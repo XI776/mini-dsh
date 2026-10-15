@@ -21,6 +21,8 @@ These tasks are deliberately tiny (one-file baselines, six to eight steps, 6,000
 | `config_migration.json` | config, defaults and client modules | base URL normalization |
 | `logtriage.json` | 33 KB event log plus a stub module | unimplemented summary |
 
+All six real cases share one budget: 50 steps, 200,000 tokens, 100 tool calls and 1,800 seconds. The first calibration batch used smaller, per-case limits, and six of twelve runs ended at `tool_calls`. In the 108-run formal batch, 35 runs still ended at a budget limit. Report budget exhaustion alongside Token and cost figures; totals from truncated runs do not isolate the effect of a Context strategy. Runs from the earlier calibration batch stay in `.runs/experiments/` as superseded artifacts.
+
 `real/<task>/reference/` contains the reference fix for each task. It is never copied into an agent workspace: the evaluator copies only `real/<task>/baseline/`. `tests/test_real_tasks.py` uses the reference to assert, in CI, that every baseline starts red, that the reference turns public and holdout tests green, and that holdout content does not appear in the baseline.
 
 `real/logtriage/generate_log.py` regenerates the checked-in log fixture deterministically; the holdout counts in `real/logtriage.json` must be updated together with it.

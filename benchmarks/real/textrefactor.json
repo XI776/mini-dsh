@@ -24,13 +24,23 @@
     "test_hidden.py": "import unittest\n\nimport cli\nimport importer\nimport report\nfrom util.text import normalize\n\n\nclass HoldoutTests(unittest.TestCase):\n    def test_importer_preserves_the_case_of_names(self):\n        self.assertEqual(importer.import_row({\"name\": \"  Acme  Corp \", \"qty\": \"3\"}),\n                         {\"name\": \"Acme Corp\", \"qty\": 3})\n\n    def test_other_callers_still_lowercase(self):\n        self.assertEqual(report.render_title(\" Q3 Revenue \"), \"== q3 revenue ==\")\n        self.assertEqual(cli.describe(\" Hello \"), \"searching for 'hello'\")\n\n    def test_keep_case_still_collapses_whitespace(self):\n        self.assertEqual(normalize(\" A\\t\\tB\\nC \", keep_case=True), \"A B C\")\n\n    def test_the_default_is_still_lowercase(self):\n        self.assertEqual(normalize(\"AbC\"), \"abc\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
   },
   "allowed_commands": [
-    "python"
+    "python",
+    "ls",
+    "grep",
+    "find",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "sed",
+    "sort",
+    "uniq"
   ],
   "test_timeout_s": 60,
   "limits": {
-    "steps": 18,
-    "tokens": 90000,
-    "tool_calls": 18,
-    "wall_seconds": 360
+    "steps": 50,
+    "tokens": 200000,
+    "tool_calls": 100,
+    "wall_seconds": 1800
   }
 }

@@ -42,6 +42,8 @@ DeepSeek 适配器对 408、429、5xx 与传输错误做有界重试（默认最
 
 ## 验证
 
+`uv run agent-harness experiment-report <实验目录> [--baseline full_history]` 按**任务内配对**比较各策略：先取每个任务内各策略的中位数，再给出相对基线的差值中位数、以及有多少个任务的符号与之一致，并同时报告未知 Usage、缓存拆分缺失、预算耗尽与模型重试次数。`summary.json` 的均值会被单个未知 Usage 调用拉成 `null`，且看不出差异来自哪个任务；配对报告用于回答"差异是否在每个任务上同向"，不回答"为什么"。
+
 运行 `uv run agent-harness experiment-verify <实验目录>`。校验器核对运行矩阵、策略轮换、Trace 与记录、测试结论、摘要聚合、模型/Context 快照、价格快照哈希和仍可访问的输入源哈希。缺少测试、Trace 或完整终态会报错；实验未完成会报 `incomplete_experiment`。输入源不可访问时仍可检查保存的快照与 Trace，但不能再次确认源文件未变化。旧版实验 schema 1 支持回读，可能没有输入快照。
 
 完整实验可运行 `uv run agent-harness experiment-seal <实验目录> <外部锚点.json>`，再以 `uv run agent-harness experiment-verify <实验目录> --anchor <外部锚点.json>` 检查文件字节变化。锚点应在实验完成后独立保存；同一操作者若能改写锚点和产物，哈希校验仍无法证明真实性。被 Git 忽略的原始 Trace 也必须另行保存供复核。
@@ -65,5 +67,7 @@ DeepSeek 适配器对 408、429、5xx 与传输错误做有界重试（默认最
 该旧实验现有独立文件哈希锚点 `docs/evidence/context-example-1d1b71fa.json`，但旧 schema 缺失的输入快照不能靠事后哈希补回。
 
 `.runs/experiments/real-context-20261015-b`：两任务 × 六策略 × 每任务每策略三次，共 36 次真实 DeepSeek Flash 运行；36 条 Trace、输入快照及 39 个锚定文件校验通过，27 次公开及留出测试成功。11 次出现 DeepSeek HTTP 503 并缺失完整 Usage，故本批次只作为故障归因与评测链路证据，不用于 Context 效果排名。完整数据及费用口径见 [实验报告](experiment-report.md)。
+
+`.runs/experiments/real-context-20261015-180556`：六任务 × 六策略 × 每任务每策略三次，共 108 次真实 DeepSeek Flash 运行；70 次公开与留出测试同时成功，108 条 Trace 和输入快照均通过校验，35 次触及 Agent 预算。独立锚点 `docs/evidence/real-context-20261015-180556.json` 覆盖 137 个文件；本地 ZIP 的 176 个文件和 6 个任务输入快照通过验包。全部 108 次都有提供方 Usage 和缓存拆分，费用仍只有价格快照估算，没有供应商账单值。任务少、重复有限、执行步数差异大，具体数字及局限见 [实验报告](experiment-report.md)，两个失败路径见 [Trace 案例](trace-cases-20261015.md)。
 
 固定历史价格表的离线重算见 [实验报告](experiment-report.md)。旧 Trace 缺少原始缓存拆分，重算器会标记为未验证；新 Trace 若明确缺少缓存拆分则不给出完整费用估算。重算值不是供应商实报费用。

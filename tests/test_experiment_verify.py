@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import json
 import hashlib
+import io
 import tempfile
+import time
 import unittest
 import zipfile
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
+import agent_harness.experiment as experiment_module
+from agent_harness.cli import _print_batch_progress
 from agent_harness.context import FullHistory, SummaryContext
 from agent_harness.bundle import export_experiment, verify_bundle
 from agent_harness.evidence import seal_experiment, verify_anchor
@@ -33,7 +38,7 @@ class ExperimentVerifyTests(unittest.TestCase):
         self.experiment = self.root / "experiment"
 
     def _build_experiment(self, model_factory=None, pricing_snapshot=None, image_resolver=None,
-                          cost_guard=None) -> None:
+                          cost_guard=None, progress=None, progress_interval_s=0) -> None:
         class FakeDockerRunner:
             def __init__(self, image, session):
                 pass
@@ -57,7 +62,38 @@ class ExperimentVerifyTests(unittest.TestCase):
                 model_spec={"label": "script:test", "max_output_tokens": 4096} if cost_guard else None,
                 max_estimated_cost_usd=cost_guard,
                 max_output_tokens=4096 if cost_guard else None,
+                progress=progress,
+                progress_interval_s=progress_interval_s,
             )
+
+    def test_batch_progress_reports_completions_and_heartbeat(self) -> None:
+        updates = []
+        original_evaluate = experiment_module.evaluate
+
+        def slow_evaluate(*args, **kwargs):
+            time.sleep(0.025)
+            return original_evaluate(*args, **kwargs)
+
+        with patch("agent_harness.experiment.evaluate", side_effect=slow_evaluate):
+            self._build_experiment(progress=updates.append, progress_interval_s=0.005)
+        started = [update for update in updates if update.phase == "started"]
+        completed = [update for update in updates if update.phase == "completed"]
+        self.assertEqual([update.index for update in started], [1, 2, 3, 4])
+        self.assertEqual([update.completed for update in completed], [1, 2, 3, 4])
+        self.assertTrue(all(update.total == 4 and update.success for update in completed))
+        self.assertTrue(any(update.phase == "running" for update in updates))
+        self.assertEqual(completed[-1].eta_s, 0)
+
+    def test_batch_progress_prints_to_stderr(self) -> None:
+        output = io.StringIO()
+        update = experiment_module.ExperimentProgress(
+            "completed", 2, 4, 2, "answer", "summary", 0, 90, 40, 90, True,
+        )
+        with redirect_stderr(output):
+            _print_batch_progress(update)
+        self.assertIn("[2/4] COMPLETED", output.getvalue())
+        self.assertIn("ETA=~0:01:30", output.getvalue())
+        self.assertIn("success=yes", output.getvalue())
 
     def test_pinned_image_identity_is_recorded_and_verified(self) -> None:
         image_id = "sha256:" + "a" * 64

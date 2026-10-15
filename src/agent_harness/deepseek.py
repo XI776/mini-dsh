@@ -273,6 +273,10 @@ class DeepSeekModel:
                     return ModelResult(str(message.get("content") or ""), tuple(calls), False, usage, attempts)
                 if reason == "stop" and not calls:
                     return ModelResult(str(message.get("content") or ""), (), True, usage, attempts)
+                if reason == "length":
+                    # The provider cut the generation at max_tokens, so the turn is
+                    # unusable. Retrying the same request would truncate the same way.
+                    raise ValueError("response was truncated at the max_tokens limit")
                 raise ValueError(f"unsupported finish reason: {reason}")
             except (KeyError, IndexError, TypeError, ValueError) as exc:
                 raise ModelFailure(f"invalid DeepSeek completion: {exc}", usage) from exc

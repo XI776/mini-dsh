@@ -24,13 +24,23 @@
     "test_hidden.py": "import unittest\n\nfrom app.client import build_client\nfrom app.config import load_config\n\n\nclass HoldoutTests(unittest.TestCase):\n    def test_retries_accepts_a_numeric_string(self):\n        config = load_config({\"retries\": \"5\"})\n        self.assertEqual(config[\"retries\"], 5)\n        self.assertIsInstance(config[\"retries\"], int)\n        self.assertNotIsInstance(config[\"retries\"], bool)\n\n    def test_retries_rejects_invalid_values(self):\n        for value in (\"many\", -1, 0, True, 2.5):\n            with self.assertRaises(ValueError):\n                load_config({\"retries\": value})\n\n    def test_base_url_requires_https(self):\n        with self.assertRaises(ValueError):\n            load_config({\"base_url\": \"http://reports.internal\"})\n\n    def test_base_url_rejects_a_missing_host(self):\n        with self.assertRaises(ValueError):\n            load_config({\"base_url\": \"https:///\"})\n\n    def test_timeout_accepts_padded_strings_and_keeps_the_default(self):\n        self.assertEqual(load_config({\"timeout\": \" 12 \"})[\"timeout_s\"], 12)\n        self.assertEqual(load_config({})[\"timeout_s\"], 30)\n\n    def test_client_exposes_normalized_values(self):\n        client = build_client({\"timeout\": \"9\", \"retries\": \"7\", \"base_url\": \"https://reports.internal/\"})\n        self.assertIsInstance(client.timeout_s, int)\n        self.assertIsInstance(client.retries, int)\n        self.assertEqual(client.base_url, \"https://reports.internal\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
   },
   "allowed_commands": [
-    "python"
+    "python",
+    "ls",
+    "grep",
+    "find",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "sed",
+    "sort",
+    "uniq"
   ],
   "test_timeout_s": 60,
   "limits": {
-    "steps": 18,
-    "tokens": 90000,
-    "tool_calls": 18,
-    "wall_seconds": 360
+    "steps": 50,
+    "tokens": 200000,
+    "tool_calls": 100,
+    "wall_seconds": 1800
   }
 }

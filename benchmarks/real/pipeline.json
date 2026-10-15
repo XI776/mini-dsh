@@ -24,13 +24,23 @@
     "test_hidden.py": "import unittest\n\nimport pipeline\n\n\nclass DedupeHoldoutTests(unittest.TestCase):\n    def test_first_record_wins(self):\n        records = [\n            {\"id\": 1, \"source\": \"a\", \"count\": 2, \"payload\": \"first\"},\n            {\"id\": 1, \"source\": \"b\", \"count\": 9, \"payload\": \"second\"},\n        ]\n        self.assertEqual(pipeline.dedupe(records), [records[0]])\n\n    def test_order_of_first_appearance_is_kept(self):\n        records = [\n            {\"id\": 3, \"source\": \"a\", \"count\": 1},\n            {\"id\": 1, \"source\": \"a\", \"count\": 1},\n            {\"id\": 3, \"source\": \"b\", \"count\": 5},\n            {\"id\": 2, \"source\": \"b\", \"count\": 1},\n        ]\n        self.assertEqual([record[\"id\"] for record in pipeline.dedupe(records)], [3, 1, 2])\n\n\nclass ChunkHoldoutTests(unittest.TestCase):\n    def test_partial_chunk_sizes(self):\n        self.assertEqual([len(group) for group in pipeline.chunk(list(range(10)), 4)], [4, 4, 2])\n\n    def test_empty_input_yields_no_chunks(self):\n        self.assertEqual(pipeline.chunk([], 4), [])\n\n\nclass RunHoldoutTests(unittest.TestCase):\n    def test_every_record_reaches_the_summary(self):\n        records = [{\"id\": index, \"source\": \"a\", \"count\": 1} for index in range(5)]\n        result = pipeline.run(records, size=2)\n        self.assertEqual(result[\"records\"], 5)\n        self.assertEqual(result[\"total_count\"], 5)\n        self.assertEqual([item[\"records\"] for item in result[\"chunks\"]], [2, 2, 1])\n\n    def test_duplicate_ids_are_dropped_before_counting(self):\n        records = [\n            {\"id\": 1, \"source\": \"a\", \"count\": 4},\n            {\"id\": 2, \"source\": \"a\", \"count\": 6},\n            {\"id\": 1, \"source\": \"a\", \"count\": 100},\n        ]\n        result = pipeline.run(records, size=10)\n        self.assertEqual(result[\"records\"], 2)\n        self.assertEqual(result[\"total_count\"], 10)\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
   },
   "allowed_commands": [
-    "python"
+    "python",
+    "ls",
+    "grep",
+    "find",
+    "cat",
+    "head",
+    "tail",
+    "wc",
+    "sed",
+    "sort",
+    "uniq"
   ],
   "test_timeout_s": 60,
   "limits": {
-    "steps": 18,
-    "tokens": 90000,
-    "tool_calls": 18,
-    "wall_seconds": 360
+    "steps": 50,
+    "tokens": 200000,
+    "tool_calls": 100,
+    "wall_seconds": 1800
   }
 }

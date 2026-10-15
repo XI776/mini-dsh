@@ -63,6 +63,7 @@ docker build --provenance=false -t coding-agent-sandbox:1 -f benchmarks/Dockerfi
 uv run --locked agent-harness eval --manifest examples/eval_case.json --script examples/eval_fix.json
 uv run --locked agent-harness eval-batch --plan benchmarks/plan.json --script-map benchmarks/scripts/map.json --output .runs/experiments/local-$(date +%s)
 uv run --locked agent-harness experiment-verify .runs/experiments/<实验目录>
+uv run --locked agent-harness experiment-report .runs/experiments/<实验目录> [--baseline full_history]
 uv run --locked agent-harness experiment-seal .runs/experiments/<实验目录> docs/evidence/<名称>.json
 uv run --locked agent-harness experiment-verify .runs/experiments/<实验目录> --anchor docs/evidence/<名称>.json
 uv run --locked agent-harness experiment-export .runs/experiments/<实验目录> docs/evidence/<名称>.json .exports/<名称>.zip
@@ -78,6 +79,8 @@ uv run --locked agent-harness eval-batch --plan benchmarks/real-context-plan.jso
 ```
 
 `benchmarks/real/` 是为 Context 消融准备的真实模型任务集：每个任务是一个小仓库，README 写明契约，公开测试初始失败，留出测试覆盖文档中的每条规则；`benchmarks/pilot-plan.json` 是两任务小批次。费用阈值必须按 `--max-estimated-cost-usd` 的保守估计重新计算，不要沿用示例值。
+
+`eval-batch` 会在终端 stderr 显示当前序号、任务、策略、单次与累计耗时；单次运行超过 30 秒时每 30 秒更新一次。完成一项后显示按已完成运行平均耗时推算的粗略 ETA；不同任务耗时差异较大时 ETA 会变化。实验记录与最终 JSON 输出格式不受进度显示影响。
 
 运行前应重新核对价格快照与费用阈值；该命令会发起付费模型请求。DeepSeek 适配器对 408、429、5xx 与传输错误做有界重试（默认 3 次尝试，指数退避，不超过本步剩余超时），尝试次数写入 `model_response` / `model_error` 的 `attempts` 字段；失败尝试没有 Usage，不计入本地统计，也不代表供应商未计费。
 `eval` 与 `eval-batch` 在开始时把镜像标签解析为本地 `sha256:` 镜像 ID，后续所有容器都按该 ID 启动；Manifest 同时保存来源标签和实际 ID。镜像 ID 只证明本机容器字节一致，跨机器复现还需发布镜像或记录可拉取的仓库摘要。
@@ -96,9 +99,9 @@ uv run --locked agent-harness reprice --experiment .runs/experiments/<实验目�
 
 ## 已有证据与限制
 
-新实验 `.runs/experiments/real-context-20261015-b` 含 2 个任务 × 6 策略 × 3 次的 36 次真实 DeepSeek Flash 运行，27/36 次通过公开及留出测试，36 条 Trace 和独立文件锚点校验通过；其中 11 次出现供应商 HTTP 503，因此不能据此给策略排名。旧实验 `.runs/experiments/context-example-1d1b71fa` 含 1 个任务 × 6 策略 × 1 次真实运行，六次测试通过，但缺少输入快照。新固定镜像 ID 的确定性脚本实验 36/36 次通过，只证明评测链路工作。历史描述中的“24 次对照”“1,010 次离线执行”“10 次真实模型回归”及成本优化比例，没有对应的历史原始证据，不能作为本仓库结果。
-[实验报告](docs/experiment-report.md)列出可复算的原始观察值和历史价格快照估算；[简历素材](docs/resume-material.md)仅使用已验证能力。
+正式批次 `.runs/experiments/real-context-20261015-180556` 含 6 个任务 × 6 策略 × 3 次的 **108 次真实 DeepSeek Flash 运行**，70/108 次通过公开及留出测试；108 条 Trace、输入快照和独立锚点校验通过。35 次触及 Agent 预算，因此本批次只能描述该任务集的观察结果，不能据此断言 Context 策略的一般性能优势。较早的 36 次真实运行有 11 次遇到供应商 HTTP 503，保留作故障证据。固定镜像 ID 的确定性脚本实验 36/36 次通过，只证明评测链路工作。历史描述中的“24 次对照”“1,010 次离线执行”“10 次真实模型回归”及成本优化比例，没有对应的历史原始证据，不能作为本仓库结果。
+[实验报告](docs/experiment-report.md)列出批次结果和费用估算；[Trace 失败案例](docs/trace-cases-20261015.md)记录可复核的首次分叉与具体失败步骤；[简历素材](docs/resume-material.md)仅使用已验证能力。
 
 Docker 容器采用无网络、只读根文件系统、去能力、内存和进程限制，但共享宿主机内核，不能抵御所有恶意代码。宿主机 `run`、模型桥接和 MCP 进程只适用于可信配置。Trace 可能包含任务内容与工具输出；当前仅对配置的 API Key 做精确值脱敏。文件工具单次读写上限为 1 MB；单个子进程最多捕获 16 MiB 输出，单个 Session 的产物默认配额为 512 MiB。恢复只支持经过工作区哈希检查点的安全边界，不支持对结果不确定的工具调用自动重试。进一步边界见 [安全说明](docs/security.md)。
 
-下一步优先扩大真实模型任务与重复次数、对恢复机制增加更强的工作区快照和故障注入、收紧宿主机与 MCP 的隔离；在此之前不对 Context 策略做性能排名。
+下一步优先增加更具代表性的任务并分析 35 次预算耗尽、完善故障注入和跨环境复现、收紧宿主机与 MCP 的隔离；在此之前不对 Context 策略做一般性能排名。
